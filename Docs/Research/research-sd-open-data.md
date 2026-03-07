@@ -35,8 +35,30 @@ The City of San Diego Open Data Portal at `data.sandiego.gov` is a custom-built 
 
 ### 4. Building Permits (County level — Socrata)
 - **URL:** https://data.sandiegocounty.gov/Housing-and-Infrastructure/Building-Permits/dyzh-7eat
-- **Note:** This is the **County** portal (different from City), and it IS Socrata-based, meaning it likely has a SODA API.
-- **SODA endpoint (likely):** `https://data.sandiegocounty.gov/resource/dyzh-7eat.json`
+- **Note:** This is the **County** portal (different from City), and it IS Socrata-based, meaning it has a SODA API.
+- **SODA endpoint:** `https://data.sandiegocounty.gov/resource/dyzh-7eat.json`
+- **Example query:**
+```
+GET https://data.sandiegocounty.gov/resource/dyzh-7eat.json?$where=site_address like '%MAIN ST%'&$limit=50&$order=issue_date DESC
+```
+- No auth required for reads. API token optional (increases rate limits).
+
+### 5. NextRequest — Public Records Portal
+- **URL:** https://sandiego.nextrequest.com/
+- **What it is:** 40,000+ searchable public records requests (FOIA-style). Anyone can search published requests and attached documents.
+- **Use case:** Source of real permit denial/approval documents, DSD correspondence, and homeowner complaints. Useful for understanding real rejection patterns and what people struggle with.
+- **Search tip:** Search for "ADU permit denied", "plan check corrections", "DSD overcharge" etc. to find real cases with attached city documents.
+- **Not an API** — manual search only. But valuable for enriching the system prompt with real-world examples.
+
+### 6. Permitting Center Dashboard
+- **URL:** https://www.sandiego.gov/development-services/permits-inspections/dashboard
+- **What it is:** City's own aggregate stats on permit activity — processing times, volume, approval rates.
+- **Use case:** Source of real numbers for the demo narrative ("the average ADU permit takes X days") and for calibrating the timeline estimator.
+
+### 7. Permit Activity Reports
+- **URL:** https://www.sandiego.gov/development-services/records/permit-activity-reports
+- **What it is:** Published reports on DSD permit activity over time.
+- **Use case:** Historical trends, volume data, processing time changes year-over-year.
 
 ## Data Architecture
 
