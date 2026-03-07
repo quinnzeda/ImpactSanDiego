@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Permit Buddy — San Diego</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#FFF;--bg2:#F9FAFB;--bg3:#F3F4F6;--border:#E5E7EB;--border-l:#F3F4F6;
+    --text:#111827;--text2:#6B7280;--text3:#9CA3AF;--text4:#D1D5DB;
+    --green:#059669;--green-bg:#ECFDF5;--green-bdr:#A7F3D0;
+    --amber:#D97706;--amber-bg:#FFFBEB;--amber-bdr:#FDE68A;
+    --blue:#2563EB;--blue-bg:#EFF6FF;--blue-bdr:#BFDBFE;
+    --violet:#7C3AED;--violet-bg:#F5F3FF;--violet-bdr:#DDD6FE;
+    --r:12px;--rl:16px;--rxl:24px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.6}
+  .screen{display:none;position:fixed;inset:0;overflow:hidden}
+  .screen.active{display:flex;flex-direction:column}
+
+  .nav{height:56px;border-bottom:1px solid var(--border-l);display:flex;align-items:center;padding:0 24px;flex-shrink:0;background:var(--bg);z-index:10}
+  .nav-logo{font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;cursor:pointer;letter-spacing:-.3px}
+
+  /* === MAIN LAYOUT: Chat left, Canvas right === */
+  .app{flex:1;display:flex;overflow:hidden}
+
+  /* Chat column */
+  .chat{width:440px;flex-shrink:0;border-right:1px solid var(--border-l);display:flex;flex-direction:column;background:var(--bg)}
+  .chat-welcome{flex:1;display:flex;flex-direction:column;justify-content:center;padding:40px 32px;overflow-y:auto}
+  .chat-welcome h1{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+  .chat-welcome p{font-size:16px;color:var(--text2);margin-bottom:32px;line-height:1.6}
+  .welcome-suggestions{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+  .suggestion{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border-l);border-radius:var(--rl);cursor:pointer;transition:all .15s;font-size:14px;font-weight:500;color:var(--text)}
+  .suggestion:hover{border-color:var(--border);background:var(--bg3)}
+  .suggestion .s-icon{font-size:20px}
+  .suggestion .s-text{flex:1}
+  .suggestion .s-arrow{color:var(--text4);font-size:14px}
+
+  .chat-thread{flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:16px}
+  .msg{max-width:360px;font-size:15px;line-height:1.6}
+  .msg.ai{align-self:flex-start}
+  .msg.me{align-self:flex-end}
+  .msg-bubble{padding:14px 18px;border-radius:20px}
+  .msg.ai .msg-bubble{background:var(--bg2);border:1px solid var(--border-l);border-bottom-left-radius:4px}
+  .msg.me .msg-bubble{background:var(--text);color:#fff;border-bottom-right-radius:4px}
+  .msg strong{font-weight:700}
+
+  .chat-input{padding:16px 24px;border-top:1px solid var(--border-l);background:var(--bg)}
+  .input-pill{display:flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:28px;overflow:hidden;transition:all .2s}
+  .input-pill:focus-within{border-color:var(--text);background:var(--bg)}
+  .input-pill input{flex:1;padding:14px 20px;font-size:15px;border:none;outline:none;background:transparent}
+  .input-pill button{padding:10px 22px;margin:4px;background:var(--text);color:#fff;border:none;border-radius:24px;font-size:14px;font-weight:700;cursor:pointer;transition:all .12s}
+  .input-pill button:hover{background:#000}
+
+  /* Canvas (right side) — where interactive components appear */
+  .canvas{flex:1;overflow-y:auto;background:var(--bg2);padding:0}
+  .canvas-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);text-align:center;padding:48px}
+  .canvas-empty .ce-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+  .canvas-empty p{font-size:15px;max-width:280px}
+
+  .canvas-content{padding:32px 40px;display:none}
+  .canvas-content.active{display:block}
+
+  /* --- COMPONENT: Permit Check --- */
+  .permit-check{background:var(--bg);border-radius:var(--rxl);padding:32px;border:1px solid var(--border-l);margin-bottom:24px}
+  .pc-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+  .pc-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px}
+  .pc-icon.yes{background:var(--amber-bg)}
+  .pc-icon.no{background:var(--green-bg)}
+  .pc-title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+  .pc-sub{font-size:14px;color:var(--text2)}
+  .pc-verdict{padding:16px 20px;border-radius:var(--r);font-size:15px;line-height:1.6;margin-bottom:16px}
+  .pc-verdict.needs{background:var(--amber-bg);border:1px solid var(--amber-bdr)}
+  .pc-verdict.doesnt{background:var(--green-bg);border:1px solid var(--green-bdr)}
+  .pc-why{font-size:14px;color:var(--text2);line-height:1.7}
+  .pc-why strong{color:var(--text);font-weight:600}
+
+  /* --- COMPONENT: Address Lookup --- */
+  .addr-card{background:var(--bg);border-radius:var(--rxl);padding:32px;border:1px solid var(--border-l);margin-bottom:24px}
+  .addr-card h2{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px}
+  .addr-loc{font-size:14px;color:var(--text2);margin-bottom:16px}
+  .addr-pills{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .ap{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700}
+  .ap.coastal{background:#E0F2FE;color:#0369A1}
+  .ap.historic{background:#FEF3C7;color:#92400E}
+  .addr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .ag{padding:14px 16px;background:var(--bg2);border-radius:var(--r)}
+  .ag-l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:3px}
+  .ag-v{font-size:15px;font-weight:700}
+  .ag-e{font-size:12px;color:var(--text2);margin-top:2px}
+
+  /* --- COMPONENT: Options Explorer --- */
+  .options-card{background:var(--bg);border-radius:var(--rxl);padding:32px;border:1px solid var(--border-l);margin-bottom:24px}
+  .options-card h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px}
+  .options-card .oc-sub{font-size:14px;color:var(--text2);margin-bottom:20px}
+  .option{display:flex;gap:16px;padding:18px;background:var(--bg2);border:2px solid var(--border-l);border-radius:var(--rl);margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .option:hover{border-color:var(--border)}
+  .option.selected{border-color:var(--blue);background:var(--blue-bg)}
+  .opt-icon{font-size:28px;flex-shrink:0}
+  .opt-info{flex:1}
+  .opt-name{font-size:16px;font-weight:700;margin-bottom:2px}
+  .opt-desc{font-size:13px;color:var(--text2);line-height:1.5}
+  .opt-meta{display:flex;gap:12px;margin-top:8px}
+  .opt-tag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border-l)}
+
+  /* --- COMPONENT: Cost Calculator --- */
+  .calc-card{background:var(--bg);border-radius:var(--rxl);padding:32px;border:1px solid var(--border-l);margin-bottom:24px}
+  .calc-card h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px}
+  .calc-card .cc-sub{font-size:14px;color:var(--text2);margin-bottom:24px}
+
+  .slider-group{margin-bottom:24px}
+  .slider-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .slider-label span{font-size:14px;font-weight:600}
+  .slider-label .sl-val{font-size:18px;font-weight:800;color:var(--blue)}
+  .slider{width:100%;height:6px;-webkit-appearance:none;appearance:none;border-radius:3px;background:var(--bg3);outline:none}
+  .slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:var(--text);cursor:pointer;border:3px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .threshold-note{font-size:12px;color:var(--amber);font-weight:600;margin-top:6px;display:none}
+  .threshold-note.show{display:block}
+
+  .cost-breakdown{background:var(--bg2);border-radius:var(--rl);padding:20px;margin-top:20px}
+  .cb-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:12px}
+  .cb-row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px;border-bottom:1px solid var(--border-l)}
+  .cb-row:last-child{border:none;font-weight:800;padding-top:12px;font-size:16px}
+  .cb-row .cbl{color:var(--text2)}
+
+  .big-numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+  .bn{padding:20px;background:var(--bg2);border-radius:var(--rl);text-align:center}
+  .bn-v{font-size:26px;font-weight:800;letter-spacing:-.3px}
+  .bn-l{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px}
+
+  /* --- COMPONENT: Ready card --- */
+  .ready-card{background:linear-gradient(135deg,var(--green-bg),var(--blue-bg));border-radius:var(--rxl);padding:32px;border:1px solid var(--green-bdr);text-align:center}
+  .ready-card h2{font-size:22px;font-weight:800;margin-bottom:8px}
+  .ready-card p{font-size:15px;color:var(--text2);margin-bottom:20px}
+  .ready-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:var(--text);color:#fff;border:none;border-radius:32px;font-size:15px;font-weight:700;cursor:pointer;transition:all .12s;letter-spacing:-.1px}
+  .ready-btn:hover{background:#000;transform:translateY(-1px)}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .fi{animation:fadeUp .35s ease-out both}
+  .d1{animation-delay:.1s}.d2{animation-delay:.2s}.d3{animation-delay:.3s}.d4{animation-delay:.4s}
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: Chat + Canvas -->
+<div class="screen active" id="s1">
+  <div class="nav"><div class="nav-logo">🏠 Permit Buddy</div></div>
+  <div class="app">
+
+    <!-- CHAT -->
+    <div class="chat">
+      <!-- Welcome state (before conversation) -->
+      <div class="chat-welcome" id="welcome">
+        <h1>What do you want to build?</h1>
+        <p>Tell me about your project and I'll help you figure out what you need — permits, costs, timeline, all of it.</p>
+        <div class="welcome-suggestions">
+          <div class="suggestion" onclick="startChat('adu')">
+            <span class="s-icon">🏡</span>
+            <span class="s-text">I want to build a backyard unit (ADU)</span>
+            <span class="s-arrow">→</span>
+          </div>
+          <div class="suggestion" onclick="startChat('kitchen')">
+            <span class="s-icon">🍳</span>
+            <span class="s-text">I want to remodel my kitchen</span>
+            <span class="s-arrow">→</span>
+          </div>
+          <div class="suggestion" onclick="startChat('bathroom')">
+            <span class="s-icon">🚿</span>
+            <span class="s-text">I want to add a bathroom</span>
+            <span class="s-arrow">→</span>
+          </div>
+          <div class="suggestion" onclick="startChat('solar')">
+            <span class="s-icon">☀️</span>
+            <span class="s-text">I want to install solar panels</span>
+            <span class="s-arrow">→</span>
+          </div>
+          <div class="suggestion" onclick="startChat('garage')">
+            <span class="s-icon">🚗</span>
+            <span class="s-text">I want to convert my garage</span>
+            <span class="s-arrow">→</span>
+          </div>
+          <div class="suggestion" onclick="startChat('notsure')">
+            <span class="s-icon">🤔</span>
+            <span class="s-text">I'm not sure if I even need a permit</span>
+            <span class="s-arrow">→</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active chat thread (shown after starting) -->
+      <div class="chat-thread" id="thread" style="display:none">
+        <!-- Messages injected here -->
+      </div>
+
+      <div class="chat-input">
+        <div class="input-pill">
+          <input type="text" id="chatInput" placeholder="Describe your project or ask anything...">
+          <button onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANVAS -->
+    <div class="canvas">
+      <div class="canvas-empty" id="emptyCanvas">
+        <div class="ce-icon">💬</div>
+        <p>Start a conversation and I'll show you interactive tools, calculators, and your personalized plan right here.</p>
+      </div>
+
+      <!-- Step 1: Permit check -->
+      <div class="canvas-content" id="canvas-permit">
+        <div class="permit-check fi">
+          <div class="pc-header">
+            <div class="pc-icon yes">⚠️</div>
+            <div>
+              <div class="pc-title">Yes, you'll need a permit</div>
+              <div class="pc-sub">Building an ADU requires a building permit in San Diego</div>
+            </div>
+          </div>
+          <div class="pc-verdict needs">
+            <strong>An ADU is new construction</strong> — it always requires a building permit, structural review, and inspections. There's no way around this one.
+          </div>
+          <div class="pc-why">
+            <strong>Why it matters:</strong> Building without a permit means no inspections for safety. If you ever sell, the buyer's inspector will flag it. You'd either tear it out or pay for retroactive permits — which cost more and aren't guaranteed to be approved. <br><br>
+            <strong>The good news:</strong> ADUs in San Diego are approved "by right" (ministerially) — meaning no public hearing, no neighbor approval needed. It's paperwork, not politics.
+          </div>
+        </div>
+
+        <div style="font-size:14px;color:var(--text2);text-align:center;padding:8px">
+          Now let's look up your property →
+        </div>
+      </div>
+
+      <!-- Step 2: Address / property -->
+      <div class="canvas-content" id="canvas-property">
+        <div class="addr-card fi">
+          <h2>4521 Voltaire St</h2>
+          <div class="addr-loc">Ocean Beach, San Diego · Council District 2</div>
+          <div class="addr-pills">
+            <span class="ap coastal">🌊 Coastal Zone</span>
+            <span class="ap historic">🏛️ Pre-1980 · Historic review</span>
+          </div>
+          <div class="addr-grid">
+            <div class="ag"><div class="ag-l">Your lot</div><div class="ag-v">5,200 sq ft</div></div>
+            <div class="ag"><div class="ag-l">What you can build</div><div class="ag-v">Up to 2 homes</div><div class="ag-e">Plus an ADU + JADU</div></div>
+            <div class="ag"><div class="ag-l">Max height</div><div class="ag-v">30 ft</div><div class="ag-e">May be lower near coast</div></div>
+            <div class="ag"><div class="ag-l">Year built</div><div class="ag-v">1962</div><div class="ag-e">Triggers historic review</div></div>
+            <div class="ag"><div class="ag-l">Distance from edges</div><div class="ag-v">15ft · 5ft · 13ft</div><div class="ag-e">Front · Sides · Rear</div></div>
+            <div class="ag"><div class="ag-l">Past permits</div><div class="ag-v">Roof '19 · Electrical '21</div></div>
+          </div>
+        </div>
+
+        <div style="font-size:14px;color:var(--text2);text-align:center;padding:8px">
+          Now let's explore your options →
+        </div>
+      </div>
+
+      <!-- Step 3: Options explorer -->
+      <div class="canvas-content" id="canvas-options">
+        <div class="options-card fi">
+          <h2>What kind of ADU works for you?</h2>
+          <p class="oc-sub">Each option has different costs, timelines, and requirements. Pick one to explore.</p>
+
+          <div class="option" onclick="selectOption(this)">
+            <span class="opt-icon">🏗️</span>
+            <div class="opt-info">
+              <div class="opt-name">New detached ADU</div>
+              <div class="opt-desc">A standalone structure in your backyard. Most flexibility on size and layout. Requires new foundation, utilities, the works.</div>
+              <div class="opt-meta">
+                <span class="opt-tag">Up to 1,200 sq ft</span>
+                <span class="opt-tag">$150k–$350k to build</span>
+                <span class="opt-tag">6–12 months</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="option" onclick="selectOption(this)">
+            <span class="opt-icon">🔗</span>
+            <div class="opt-info">
+              <div class="opt-name">Attached ADU</div>
+              <div class="opt-desc">An addition connected to your existing house. Shares a wall, potentially shares some utilities. Slightly cheaper than detached.</div>
+              <div class="opt-meta">
+                <span class="opt-tag">Up to 1,200 sq ft</span>
+                <span class="opt-tag">$120k–$280k to build</span>
+                <span class="opt-tag">5–10 months</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="option" onclick="selectOption(this)">
+            <span class="opt-icon">🚗</span>
+            <div class="opt-info">
+              <div class="opt-name">Garage conversion</div>
+              <div class="opt-desc">Convert your existing garage into a living space. Cheapest and fastest option — no new foundation needed. You lose your garage.</div>
+              <div class="opt-meta">
+                <span class="opt-tag">Size of your garage</span>
+                <span class="opt-tag">$80k–$180k to build</span>
+                <span class="opt-tag">3–6 months</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="option" onclick="selectOption(this)">
+            <span class="opt-icon">🏠</span>
+            <div class="opt-info">
+              <div class="opt-name">Junior ADU (JADU)</div>
+              <div class="opt-desc">A small unit (≤500 sq ft) carved out of your existing house or attached garage. Kitchenette only, no full kitchen. <strong>You can build a JADU + a regular ADU on the same lot.</strong></div>
+              <div class="opt-meta">
+                <span class="opt-tag">≤500 sq ft</span>
+                <span class="opt-tag">$40k–$100k to build</span>
+                <span class="opt-tag">2–4 months</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fi d1" style="background:var(--bg);border-radius:var(--rxl);padding:20px 24px;border:1px solid var(--border-l);margin-bottom:24px">
+          <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">💡 Did you know?</div>
+          <div style="font-size:14px;line-height:1.6;color:var(--text2)">San Diego County offers <strong style="color:var(--text)">free pre-approved ADU plans</strong> that skip the architectural design phase and get reviewed faster. This can save you $5,000–$15,000 in architect fees and weeks of review time.</div>
+        </div>
+      </div>
+
+      <!-- Step 4: Calculator -->
+      <div class="canvas-content" id="canvas-calc">
+        <div class="calc-card fi">
+          <h2>Cost & timeline calculator</h2>
+          <p class="cc-sub">Adjust the size and see how it changes your costs in real time</p>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>ADU size</span>
+              <span class="sl-val" id="sizeDisplay">500 sq ft</span>
+            </div>
+            <input type="range" class="slider" id="sizeSlider" min="150" max="1200" value="500" oninput="updateCalc()">
+            <div class="threshold-note" id="schoolNote">⚠️ Over 500 sq ft adds ~$3,100 in school impact fees</div>
+            <div class="threshold-note" id="farNote">⚠️ Over 800 sq ft must comply with floor area ratio limits</div>
+          </div>
+
+          <div class="big-numbers">
+            <div class="bn"><div class="bn-v" id="totalFees">~$13.5k</div><div class="bn-l">Permit fees</div></div>
+            <div class="bn"><div class="bn-v" id="buildCost">~$175k</div><div class="bn-l">Construction est.</div></div>
+            <div class="bn"><div class="bn-v" id="timeline">6–8 mo</div><div class="bn-l">Total timeline</div></div>
+          </div>
+
+          <div class="cost-breakdown">
+            <div class="cb-title">Permit fee breakdown</div>
+            <div class="cb-row"><span class="cbl">Plan check</span><span id="fPlanCheck">$3,800</span></div>
+            <div class="cb-row"><span class="cbl">Building permit</span><span id="fBuildPermit">$3,600</span></div>
+            <div class="cb-row"><span class="cbl">Water & sewer</span><span id="fWaterSewer">$4,100</span></div>
+            <div class="cb-row"><span class="cbl">School fees</span><span id="fSchool">Exempt</span></div>
+            <div class="cb-row"><span class="cbl">Coastal permit</span><span>$1,200</span></div>
+            <div class="cb-row"><span class="cbl">Historic review</span><span>$800</span></div>
+            <div class="cb-row"><span>Estimated total</span><span id="fTotal">~$13,500</span></div>
+          </div>
+        </div>
+
+        <div class="ready-card fi d1">
+          <h2>Ready to see your full plan?</h2>
+          <p>Based on your choices, I've built a step-by-step plan with everything you need to do, in order, with direct links to every form and office.</p>
+          <button class="ready-btn" onclick="showPlan()">Show me my plan →</button>
+        </div>
+      </div>
+
+      <!-- Step 5: The plan (generated from decisions) -->
+      <div class="canvas-content" id="canvas-plan">
+        <div style="margin-bottom:28px" class="fi">
+          <div style="font-size:13px;color:var(--text3);margin-bottom:4px">4521 Voltaire St · Ocean Beach · Detached ADU · 500 sq ft</div>
+          <div style="font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px">Your permit plan</div>
+          <div style="display:inline-block;padding:4px 12px;background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;border-radius:20px">ADU Permit · Ministerial (no hearing needed)</div>
+        </div>
+
+        <div class="big-numbers fi d1">
+          <div class="bn"><div class="bn-v">~$13.5k</div><div class="bn-l">Permit fees</div></div>
+          <div class="bn"><div class="bn-v">6–8 mo</div><div class="bn-l">Timeline</div></div>
+          <div class="bn"><div class="bn-v">7 steps</div><div class="bn-l">To complete</div></div>
+        </div>
+
+        <!-- Phase 1 -->
+        <div class="fi d2" style="margin-bottom:28px">
+          <div style="display:inline-flex;padding:5px 12px;background:var(--green-bg);border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:12px">🟢 Do this now · Free · 1–2 weeks</div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);overflow:hidden;margin-bottom:8px;cursor:pointer" onclick="this.classList.toggle('_open');this.querySelector('.sb').style.display=this.classList.contains('_open')?'block':'none'">
+            <div style="display:flex;gap:14px;padding:16px 20px;align-items:center">
+              <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">1</div>
+              <div style="flex:1"><div style="font-size:15px;font-weight:700">Photograph your existing home</div><div style="font-size:13px;color:var(--text2)">All four sides in daylight — 30 minutes</div></div>
+              <span style="color:var(--text4)">›</span>
+            </div>
+            <div class="sb" style="display:none;padding:0 20px 20px 66px;font-size:14px;line-height:1.7">
+              <p>Your home was built in 1962, so any permit triggers a historic review. The city needs photos of your house as it exists now.</p>
+              <p style="margin-top:10px"><strong>What to shoot:</strong> All four sides straight-on, any original features, your backyard, any detached structures.</p>
+              <div style="padding:12px 16px;background:var(--green-bg);border-radius:8px;font-size:13px;margin-top:10px">✅ Shoot on a clear day, no cars blocking the view, full facade in each shot.</div>
+            </div>
+          </div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);overflow:hidden;margin-bottom:8px;cursor:pointer" onclick="this.classList.toggle('_open');this.querySelector('.sb').style.display=this.classList.contains('_open')?'block':'none'">
+            <div style="display:flex;gap:14px;padding:16px 20px;align-items:center">
+              <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">2</div>
+              <div style="flex:1"><div style="font-size:15px;font-weight:700">Request your Assessor Building Record</div><div style="font-size:13px;color:var(--text2)">5 min online, then 5–7 day wait</div></div>
+              <span style="color:var(--text4)">›</span>
+            </div>
+            <div class="sb" style="display:none;padding:0 20px 20px 66px;font-size:14px;line-height:1.7">
+              <p>The city needs this document to complete the historic review. Request it now while you work on other steps.</p>
+              <a href="https://arcc-public.sandiegocounty.gov/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:var(--text);color:#fff;border-radius:24px;font-size:13px;font-weight:700;text-decoration:none;margin-top:8px">Request your record →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="fi d3" style="margin-bottom:28px">
+          <div style="display:inline-flex;padding:5px 12px;background:var(--violet-bg);border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--violet);margin-bottom:12px">🟣 Hire professionals · 2–4 weeks · $5k–15k</div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);overflow:hidden;margin-bottom:8px;cursor:pointer" onclick="this.classList.toggle('_open');this.querySelector('.sb').style.display=this.classList.contains('_open')?'block':'none'">
+            <div style="display:flex;gap:14px;padding:16px 20px;align-items:center">
+              <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">3</div>
+              <div style="flex:1"><div style="font-size:15px;font-weight:700">Hire an architect and get plans drawn</div><div style="font-size:13px;color:var(--text2)">Or use free pre-approved county plans</div></div>
+              <span style="color:var(--text4)">›</span>
+            </div>
+            <div class="sb" style="display:none;padding:0 20px 20px 66px;font-size:14px;line-height:1.7">
+              <p>Your architect produces the complete plan set: site plan, floor plan, elevations, structural calcs, Title 24 energy calcs, and stormwater checklist.</p>
+              <div style="padding:12px 16px;background:var(--amber-bg);border-radius:8px;font-size:13px;margin-top:10px;border:1px solid var(--amber-bdr)"><strong>⚠️ 40% of ADU permits</strong> in San Diego get sent back for missing Title 24 energy calcs. Make sure they're included in the first submittal.</div>
+              <p style="margin-top:12px">Your setbacks: <strong>15ft from street · 5ft from neighbors · 13ft from back.</strong></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="fi d3" style="margin-bottom:28px">
+          <div style="display:inline-flex;padding:5px 12px;background:var(--blue-bg);border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:12px">🔵 Submit everything</div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);overflow:hidden;margin-bottom:8px;cursor:pointer" onclick="this.classList.toggle('_open');this.querySelector('.sb').style.display=this.classList.contains('_open')?'block':'none'">
+            <div style="display:flex;gap:14px;padding:16px 20px;align-items:center">
+              <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">4</div>
+              <div style="flex:1"><div style="font-size:15px;font-weight:700">Submit building + coastal permits together</div><div style="font-size:13px;color:var(--text2)">Through the OpenDSD portal</div></div>
+              <span style="color:var(--text4)">›</span>
+            </div>
+            <div class="sb" style="display:none;padding:0 20px 20px 66px;font-size:14px;line-height:1.7">
+              <p>Submit both permits at the same time. If you do the building permit first, the coastal review becomes a bottleneck.</p>
+              <a href="https://aca-prod.accela.com/SANDIEGO/Default.aspx" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:var(--text);color:#fff;border-radius:24px;font-size:13px;font-weight:700;text-decoration:none;margin-top:8px">Go to permit portal →</a>
+            </div>
+          </div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);padding:16px 20px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
+            <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">5</div>
+            <div><div style="font-size:15px;font-weight:700">Pay plan check fees when invoiced</div><div style="font-size:13px;color:var(--text2)">Review doesn't start until you pay</div></div>
+          </div>
+        </div>
+
+        <!-- Phase 4 -->
+        <div style="margin-bottom:28px">
+          <div style="display:inline-flex;padding:5px 12px;background:var(--bg3);border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:12px">⚪ Wait & respond</div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);padding:16px 20px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
+            <div style="width:32px;height:32px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text2);flex-shrink:0">6</div>
+            <div><div style="font-size:15px;font-weight:700">Plan review + corrections</div><div style="font-size:13px;color:var(--text2)">60–90 days first review, then 2–3 rounds of corrections</div></div>
+          </div>
+
+          <div style="background:var(--bg);border:1px solid var(--border-l);border-radius:var(--rl);padding:16px 20px;display:flex;gap:14px;align-items:center">
+            <div style="width:32px;height:32px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0">✓</div>
+            <div><div style="font-size:15px;font-weight:700">Permit issued — start building! 🎉</div><div style="font-size:13px;color:var(--text2)">~2 days after final approval</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var thread = document.getElementById('thread');
+var step = 0;
+
+function addMsg(text, who) {
+  var d = document.createElement('div');
+  d.className = 'msg ' + who;
+  d.innerHTML = '<div class="msg-bubble">' + text + '</div>';
+  thread.appendChild(d);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function showCanvas(id) {
+  document.querySelectorAll('.canvas-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('emptyCanvas').style.display = 'none';
+  document.getElementById(id).classList.add('active');
+}
+
+function startChat(type) {
+  document.getElementById('welcome').style.display = 'none';
+  thread.style.display = 'flex';
+
+  if (type === 'adu') {
+    addMsg('I want to build a backyard unit (ADU)', 'me');
+    setTimeout(() => {
+      addMsg("Got it! An ADU is one of the best things you can do with your property in San Diego. Let me first check whether you need a permit for this. <strong>Spoiler: yes, but the good news is it's approved by right — no hearing needed.</strong>", 'ai');
+      showCanvas('canvas-permit');
+      step = 1;
+    }, 400);
+    setTimeout(() => {
+      addMsg("What's your address? I'll pull up your property details so we can see exactly what you're working with.", 'ai');
+    }, 1200);
+  } else if (type === 'notsure') {
+    addMsg("I'm not sure if I even need a permit", 'me');
+    setTimeout(() => {
+      addMsg("Good question — it depends on the type of work. What are you thinking about doing? Even a rough description helps.", 'ai');
+    }, 400);
+  } else {
+    addMsg("I want to " + (type === 'kitchen' ? 'remodel my kitchen' : type === 'bathroom' ? 'add a bathroom' : type === 'solar' ? 'install solar panels' : 'convert my garage'), 'me');
+    setTimeout(() => {
+      addMsg("Nice! Let me figure out what you'd need for that. What's your address? I'll look up your property.", 'ai');
+    }, 400);
+  }
+}
+
+function sendMessage() {
+  var input = document.getElementById('chatInput');
+  var val = input.value.trim();
+  if (!val) return;
+  addMsg(val, 'me');
+  input.value = '';
+
+  if (step === 1) {
+    setTimeout(() => {
+      addMsg("Found it! <strong>4521 Voltaire St</strong> in Ocean Beach. I pulled up all your property details — take a look at the property card on the right. Two things jump out: you're in the <strong>Coastal Zone</strong> and your home was built in <strong>1962</strong>, which means a historic review.", 'ai');
+      showCanvas('canvas-property');
+      step = 2;
+    }, 600);
+    setTimeout(() => {
+      addMsg("Now — there are actually a few different types of ADU you could build here. Let me show you the options so you can compare costs and timelines.", 'ai');
+      setTimeout(() => showCanvas('canvas-options'), 300);
+      step = 3;
+    }, 2000);
+  } else if (step >= 3) {
+    setTimeout(() => {
+      addMsg("Let me update the calculator for you. You can play with the size slider on the right to see how different sizes affect your costs and fees in real time.", 'ai');
+      showCanvas('canvas-calc');
+    }, 500);
+  }
+}
+
+function selectOption(el) {
+  document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  var name = el.querySelector('.opt-name').textContent;
+  addMsg("Let's go with the <strong>" + name + "</strong> option.", 'me');
+  setTimeout(() => {
+    addMsg("Great choice. Now let's figure out your costs. I've set up a calculator on the right — <strong>drag the size slider</strong> to see how the square footage affects your permit fees, construction costs, and timeline.", 'ai');
+    showCanvas('canvas-calc');
+  }, 500);
+}
+
+function updateCalc() {
+  var size = parseInt(document.getElementById('sizeSlider').value);
+  document.getElementById('sizeDisplay').textContent = size + ' sq ft';
+
+  var schoolNote = document.getElementById('schoolNote');
+  var farNote = document.getElementById('farNote');
+  schoolNote.className = 'threshold-note' + (size > 500 ? ' show' : '');
+  farNote.className = 'threshold-note' + (size > 800 ? ' show' : '');
+
+  // Fee calc
+  var planCheck = Math.round(2800 + size * 2);
+  var buildPermit = Math.round(2600 + size * 2);
+  var waterSewer = 4100;
+  var school = size > 500 ? 3100 : 0;
+  var coastal = 1200;
+  var historic = 800;
+  var total = planCheck + buildPermit + waterSewer + school + coastal + historic;
+
+  document.getElementById('fPlanCheck').textContent = '$' + planCheck.toLocaleString();
+  document.getElementById('fBuildPermit').textContent = '$' + buildPermit.toLocaleString();
+  document.getElementById('fWaterSewer').textContent = '$' + waterSewer.toLocaleString();
+  document.getElementById('fSchool').textContent = school > 0 ? '$' + school.toLocaleString() : 'Exempt';
+  document.getElementById('fTotal').textContent = '~$' + (Math.round(total/100)*100).toLocaleString();
+  document.getElementById('totalFees').textContent = '~$' + (Math.round(total/1000*10)/10) + 'k';
+
+  var buildLow = Math.round(size * 300 / 1000);
+  var buildHigh = Math.round(size * 400 / 1000);
+  document.getElementById('buildCost').textContent = '~$' + buildLow + 'k–$' + buildHigh + 'k';
+
+  if (size <= 400) document.getElementById('timeline').textContent = '4–6 mo';
+  else if (size <= 700) document.getElementById('timeline').textContent = '6–8 mo';
+  else document.getElementById('timeline').textContent = '8–12 mo';
+}
+
+function showPlan() {
+  showCanvas('canvas-plan');
+  addMsg("Here's your complete step-by-step plan! Click any step to expand the details. Phase 1 is stuff you can do right now for free.", 'ai');
+}
+
+function fill(id, v) { document.getElementById(id).value = v; }
+</script>
+</body>
+</html>
