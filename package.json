@@ -1,0 +1,11 @@
+{
+  "name": "permitpal-sd",
+  "private": true,
+  "scripts": {
+    "dev:mcp": "pnpm --filter @permitpal/mcp-server dev",
+    "dev:web": "pnpm --filter @permitpal/web dev",
+    "build": "pnpm -r build",
+    "build:mcp": "pnpm --filter @permitpal/mcp-server build",
+    "build:web": "pnpm --filter @permitpal/web build"
+  }
+}

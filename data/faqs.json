@@ -1,0 +1,79 @@
+{
+  "faqs": [
+    {
+      "id": 1,
+      "question": "Do I need a permit to remodel my kitchen or bathroom?",
+      "answer": "Yes, most kitchen and bathroom remodels require permits. If you're moving or adding plumbing fixtures, changing electrical wiring, or altering the structure (removing walls, adding windows), you'll need permits. A Combination Building Permit covers building, electrical, mechanical, and plumbing work in one application. Cosmetic changes like painting, replacing cabinets (same layout), or new flooring typically don't require permits.",
+      "related_permits": ["combination_building_permit", "plumbing_permit", "electrical_permit"],
+      "tags": ["residential", "remodel", "kitchen", "bathroom"]
+    },
+    {
+      "id": 2,
+      "question": "Can I build an ADU (granny flat) on my property?",
+      "answer": "Most likely yes. California state law (AB 2221, SB 897) has significantly streamlined ADU approvals. You can build one ADU and one Junior ADU (JADU) on most single-family lots. Key requirements: ADUs can be up to 1,200 sq ft for detached units, setbacks are reduced to 4 feet for detached ADUs, and the city must process your application within 60 days. Impact fees are waived for ADUs under 750 sq ft. No owner-occupancy requirement applies.",
+      "related_permits": ["adu_permit"],
+      "tags": ["residential", "ADU", "granny flat", "accessory dwelling"]
+    },
+    {
+      "id": 3,
+      "question": "Do I need a permit to install solar panels?",
+      "answer": "Yes, solar panel installations require a permit, but the process is streamlined. San Diego offers expedited review for residential solar installations. You'll need a Photovoltaic permit (or Electrical PV Combo permit that includes electrical work). Plans must show panel layout, electrical single-line diagram, and structural attachment details. Processing typically takes 1-3 weeks. AB 2188 requires cities to process residential solar applications within specified timeframes.",
+      "related_permits": ["photovoltaic_solar", "electrical_permit"],
+      "tags": ["residential", "solar", "photovoltaic", "energy"]
+    },
+    {
+      "id": 4,
+      "question": "What work can I do WITHOUT a permit?",
+      "answer": "Per San Diego Municipal Code §129.0203, the following work is generally exempt from permits: painting and wallpapering, carpeting and floor covering, replacing kitchen cabinets (same layout), replacing fixtures (same location), patios/decks under 30 inches above grade, fences/walls under 6 feet (3 feet in front yard), one-story detached accessory structures under 120 sq ft, and minor electrical work like replacing switches/outlets. Note: even exempt work must still comply with building codes.",
+      "related_permits": [],
+      "tags": ["exemption", "no permit", "residential"]
+    },
+    {
+      "id": 5,
+      "question": "How long does it take to get a building permit?",
+      "answer": "Timelines vary by project complexity: No-plan permits (water heater, HVAC replacement): Same day to 1 week. Simple residential (solar, re-roof): 1-3 weeks. Residential additions/remodels: 4-8 weeks. New construction: 8-12+ weeks. ADUs: Maximum 60 days (state mandate). You can speed things up with Rapid Review (same day to 3 days, 50% surcharge) or Express Plan Check (5-10 days, 65% surcharge).",
+      "related_permits": [],
+      "tags": ["timeline", "processing time", "plan review"]
+    },
+    {
+      "id": 6,
+      "question": "Do I need a permit to replace my water heater?",
+      "answer": "Yes, but it's a simple No-Plan permit that can often be obtained the same day. If you're replacing with a like-for-like unit (same fuel type, similar capacity, same location), you just need a No-Plan Residential MEP permit. If you're changing fuel type (gas to electric), relocating the unit, or upgrading significantly, you may need a standard plumbing or mechanical permit with plans.",
+      "related_permits": ["no_plan_residential_mep", "plumbing_permit"],
+      "tags": ["residential", "water heater", "plumbing", "simple"]
+    },
+    {
+      "id": 7,
+      "question": "Do I need a permit to build a fence?",
+      "answer": "It depends on the height and location. You do NOT need a permit for: fences/walls 6 feet or less in side/rear yards, or fences/walls 3 feet or less in front yards. You DO need a permit for: fences/walls over 6 feet, walls in the front yard over 3 feet, retaining walls over 3 feet, and any fence near a public right-of-way. Pool barriers have specific requirements regardless of height.",
+      "related_permits": ["fence_permit"],
+      "tags": ["residential", "fence", "wall", "exemption"]
+    },
+    {
+      "id": 8,
+      "question": "How do I check the status of my permit application?",
+      "answer": "You can check permit status online through the City of San Diego's Development Services Department portal at https://www.sandiego.gov/development-services. You'll need your project ID or approval ID number. You can also call the Development Services Department at (619) 446-5000 or visit their office at 1222 First Avenue, San Diego, CA 92101.",
+      "related_permits": [],
+      "tags": ["status", "tracking", "application"]
+    },
+    {
+      "id": 9,
+      "question": "Do I need a permit to convert my garage to a living space?",
+      "answer": "Yes, converting a garage to a living space requires permits. This could qualify as a Junior ADU (JADU) if it's within the existing footprint of your home and under 500 sq ft. Otherwise, it's treated as a standard conversion requiring a building permit. Key requirements include: proper egress (windows/doors), insulation, electrical outlets, smoke detectors, and possibly parking replacement. If it qualifies as a JADU, the approval process is streamlined under state ADU law.",
+      "related_permits": ["adu_permit", "combination_building_permit"],
+      "tags": ["residential", "garage conversion", "ADU", "JADU"]
+    },
+    {
+      "id": 10,
+      "question": "What is a Combination Building Permit and when do I need one?",
+      "answer": "A Combination Building Permit bundles building, electrical, mechanical, and plumbing permits into a single application. It's ideal for projects that involve multiple trades, such as kitchen remodels, bathroom remodels, tenant improvements, and interior renovations. Benefits: single application, coordinated plan review, one set of fees, and simplified inspection scheduling. It's more efficient than applying for separate permits for each trade.",
+      "related_permits": ["combination_building_permit"],
+      "tags": ["combination", "multi-trade", "remodel"]
+    },
+    {
+      "id": 11,
+      "question": "Can I do the work myself or do I need a licensed contractor?",
+      "answer": "Property owners can do work on their own property (owner-builder) but must sign an Owner-Builder Declaration (form DS-16) acknowledging they understand building codes and will be responsible for the work. However, some work requires licensed professionals: electrical work over 50 volts requires a licensed electrician in many cases, plumbing work often requires a licensed plumber, and HVAC work typically requires a licensed contractor. For projects over $500, California law generally requires a licensed contractor unless you're an owner-builder."
+    }
+  ]
+}

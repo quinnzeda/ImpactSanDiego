@@ -1,0 +1,151 @@
+{
+  "sections": [
+    {
+      "section_id": "§129.0101",
+      "title": "Purpose of Building Regulations",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "Establishes the purpose of building regulations in San Diego to safeguard public health, safety, and general welfare by regulating the design, construction, quality of materials, use and occupancy, location, and maintenance of all buildings and structures.",
+      "key_points": [
+        "All construction must comply with adopted building codes",
+        "The Building Official has authority to interpret and enforce building regulations",
+        "Permits required before commencing construction work"
+      ]
+    },
+    {
+      "section_id": "§129.0202",
+      "title": "When Building Permits Are Required",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "A building permit is required for the construction, erection, alteration, moving, demolition, repair, or conversion of any building or structure regulated by the San Diego Municipal Code.",
+      "key_points": [
+        "Any person who constructs, erects, alters, moves, demolishes, repairs, or converts any building must first obtain a permit",
+        "Permits must be obtained before work begins",
+        "Applies to both residential and commercial properties",
+        "Includes changes in use or occupancy classification"
+      ]
+    },
+    {
+      "section_id": "§129.0203",
+      "title": "Permit Exemptions",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "Lists work that is exempt from building permit requirements. Note that exemption from permits does not authorize work in violation of building codes.",
+      "key_points": [
+        "One-story detached accessory structures used as tool/storage sheds, playhouses, and similar uses, provided the floor area does not exceed 120 square feet",
+        "Fences not over 6 feet high (3 feet in required front yard setback)",
+        "Retaining walls not over 3 feet high measured from bottom of footing to top of wall, unless supporting a surcharge",
+        "Painting, papering, tiling, carpeting, countertops, and similar finish work",
+        "Temporary motion picture, television, and theater stage sets and scenery",
+        "Prefabricated swimming pools that are less than 24 inches deep",
+        "Shade cloth structures for nurseries and agriculture",
+        "Swings and other playground equipment",
+        "Window awnings not projecting more than 54 inches",
+        "Non-fixed and movable fixtures, cases, racks, counters, and partitions not over 5 feet 9 inches high",
+        "Decks and platforms not more than 30 inches above adjacent grade and not over any basement or story below",
+        "Replacement of existing equipment with similar equipment (like-for-like HVAC, water heater if same type/location)",
+        "Minor electrical work: replacing switches, receptacles, and lighting fixtures",
+        "Minor plumbing work: replacing faucets, valves, and similar devices"
+      ]
+    },
+    {
+      "section_id": "§141.0302",
+      "title": "Accessory Dwelling Units",
+      "chapter": "Chapter 14, Article 1",
+      "summary": "Regulations for Accessory Dwelling Units (ADUs) and Junior ADUs (JADUs) in San Diego, implementing California Government Code Section 65852.2.",
+      "key_points": [
+        "One ADU and one JADU permitted on lots with existing or proposed single-family dwelling",
+        "Multiple ADUs permitted on lots with existing multifamily dwelling",
+        "Detached ADUs: up to 1,200 sq ft, 16 feet height, 4-foot setbacks",
+        "Attached ADUs: up to 50% of existing living area or 1,200 sq ft, whichever is less",
+        "JADUs: maximum 500 sq ft, within existing structure footprint",
+        "No parking requirements for ADUs within 1/2 mile of transit",
+        "No impact fees for ADUs under 750 sq ft",
+        "60-day ministerial approval timeline",
+        "No owner-occupancy requirement",
+        "Cannot be sold separately from primary dwelling (with exceptions for affordable housing)"
+      ]
+    },
+    {
+      "section_id": "§129.0602",
+      "title": "Inspections Required",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "Specifies required inspections during and after construction work performed under a building permit.",
+      "key_points": [
+        "Foundation inspection: after excavation and forms are set",
+        "Framing inspection: after roof, framing, fire blocking, and bracing are in place",
+        "Electrical rough-in inspection: before covering",
+        "Plumbing rough-in inspection: before covering",
+        "Mechanical rough-in inspection: before covering",
+        "Insulation inspection: after insulation is installed",
+        "Final inspection: after all work is complete",
+        "All inspections must be requested at least 24 hours in advance",
+        "Work must not be covered until inspection approval"
+      ]
+    },
+    {
+      "section_id": "§129.0302",
+      "title": "Plan Review Process",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "Describes the plan review process for building permits, including submittal requirements, review timelines, and corrections procedures.",
+      "key_points": [
+        "Plans must be submitted with permit application",
+        "Plans reviewed for compliance with building codes, zoning, and other regulations",
+        "First review typically completed within 4-6 weeks for residential, 6-12 weeks for commercial",
+        "Corrections must be addressed and resubmitted",
+        "Plans must be prepared by licensed professionals when required by state law",
+        "Electronic plan submittal available through ProjectDox"
+      ]
+    },
+    {
+      "section_id": "§131.0222",
+      "title": "Building Height Regulations",
+      "chapter": "Chapter 13, Article 1",
+      "summary": "Establishes height limits for buildings based on the applicable zone.",
+      "key_points": [
+        "Height limits vary by zone from 30 feet (RS zones) to unlimited (downtown)",
+        "Measured from grade to highest point of structure",
+        "Exceptions for chimneys, antennas, mechanical equipment screening",
+        "Coastal zones may have additional height restrictions",
+        "ADUs limited to 16 feet for detached units"
+      ]
+    },
+    {
+      "section_id": "§131.0431",
+      "title": "Parking Regulations",
+      "chapter": "Chapter 13, Article 2",
+      "summary": "Establishes off-street parking requirements for various land uses.",
+      "key_points": [
+        "Single-family homes: 2 spaces per unit",
+        "Multi-family: varies by number of bedrooms and location",
+        "ADUs: no parking required within 1/2 mile of transit stop",
+        "Commercial: varies by use type and square footage",
+        "Parking reductions available in transit priority areas",
+        "Tandem parking allowed for ADUs and some residential uses"
+      ]
+    },
+    {
+      "section_id": "§143.0110",
+      "title": "Environmentally Sensitive Lands",
+      "chapter": "Chapter 14, Article 3",
+      "summary": "Regulations for development on or near environmentally sensitive lands including wetlands, steep hillsides, and sensitive biological resources.",
+      "key_points": [
+        "Development restricted on slopes greater than 25%",
+        "Wetlands and vernal pools require buffers",
+        "Biological surveys may be required",
+        "CEQA compliance required for significant impacts",
+        "Multi-Habitat Planning Area (MHPA) has specific development restrictions"
+      ]
+    },
+    {
+      "section_id": "§129.0111",
+      "title": "CALGreen Building Standards",
+      "chapter": "Chapter 12, Article 9",
+      "summary": "San Diego's adoption of California Green Building Standards Code with local amendments for energy efficiency and sustainability.",
+      "key_points": [
+        "All new construction must meet CALGreen Tier 1 or Tier 2 standards",
+        "Solar-ready requirements for new residential construction",
+        "Electric vehicle charging infrastructure required for new buildings",
+        "Water efficiency requirements exceed state minimums",
+        "Cool roof requirements for certain building types"
+      ]
+    }
+  ]
+}

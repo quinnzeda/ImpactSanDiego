@@ -1,0 +1,195 @@
+{
+  "permit_types": [
+    {
+      "id": "building_permit",
+      "name": "Building Permit",
+      "description": "Required for new construction, additions, and major alterations to structures",
+      "typical_projects": ["New construction", "Room additions", "Garage conversions", "Structural modifications"],
+      "required_forms": ["DS-345", "DS-560"],
+      "estimated_timeline": "4-12 weeks for plan review, varies by complexity",
+      "fees": "Based on project valuation, minimum $150",
+      "process": ["Submit application with plans", "Plan review (4-12 weeks)", "Corrections if needed", "Permit issuance", "Inspections during construction", "Final inspection"]
+    },
+    {
+      "id": "combination_building_permit",
+      "name": "Combination Building Permit",
+      "description": "Combines building, electrical, mechanical, and plumbing permits into one",
+      "typical_projects": ["Kitchen remodels", "Bathroom remodels", "Tenant improvements", "Interior renovations"],
+      "required_forms": ["DS-345", "DS-560"],
+      "estimated_timeline": "4-8 weeks plan review",
+      "fees": "Combined fees based on project valuation",
+      "process": ["Submit combined application", "Plan review", "Permit issuance", "Multi-trade inspections", "Final inspection"]
+    },
+    {
+      "id": "electrical_permit",
+      "name": "Electrical Permit",
+      "description": "Required for electrical installations, modifications, or repairs",
+      "typical_projects": ["Panel upgrades", "New circuits", "Lighting installations", "Electrical service changes"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "1-2 weeks for no-plan, 4-6 weeks with plans",
+      "fees": "Based on amperage and scope",
+      "process": ["Submit application", "Plan review (if required)", "Permit issuance", "Rough inspection", "Final inspection"]
+    },
+    {
+      "id": "mechanical_permit",
+      "name": "Mechanical Permit",
+      "description": "Required for HVAC installations, ductwork, and mechanical systems",
+      "typical_projects": ["HVAC replacement", "New ductwork", "Commercial kitchen hoods", "Ventilation systems"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "1-2 weeks for like-for-like, 4-6 weeks for new installations",
+      "fees": "Based on equipment type and BTU rating",
+      "process": ["Submit application", "Plan review (if needed)", "Permit issuance", "Rough inspection", "Final inspection"]
+    },
+    {
+      "id": "plumbing_permit",
+      "name": "Plumbing Permit",
+      "description": "Required for plumbing installations, water heaters, and sewer connections",
+      "typical_projects": ["Water heater replacement", "New bathroom fixtures", "Sewer line repair", "Gas line installation"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "1-2 weeks for simple, 4-6 weeks for complex",
+      "fees": "Based on number of fixtures",
+      "process": ["Submit application", "Plan review (if needed)", "Permit issuance", "Rough inspection", "Final inspection"]
+    },
+    {
+      "id": "no_plan_residential_mep",
+      "name": "No-Plan Residential MEP",
+      "description": "Simplified permit for residential mechanical, electrical, or plumbing work that doesn't require plan submittal",
+      "typical_projects": ["Like-for-like HVAC replacement", "Water heater replacement", "Panel upgrade (same amperage)", "Re-roofing"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "Same day to 1 week",
+      "fees": "Reduced fees, typically $100-300",
+      "process": ["Submit application (no plans needed)", "Permit issuance (often same day)", "Schedule inspection", "Final inspection"]
+    },
+    {
+      "id": "photovoltaic_solar",
+      "name": "Photovoltaic / Solar Permit",
+      "description": "Required for residential and commercial solar panel installations",
+      "typical_projects": ["Rooftop solar panels", "Ground-mounted solar", "Solar + battery storage", "EV charger with solar"],
+      "required_forms": ["DS-345", "DS-560"],
+      "estimated_timeline": "1-3 weeks (expedited available)",
+      "fees": "Based on system size (kW)",
+      "process": ["Submit application with system specs", "Plan review", "Permit issuance", "Installation", "Final inspection", "Utility interconnection"]
+    },
+    {
+      "id": "adu_permit",
+      "name": "Accessory Dwelling Unit (ADU) Permit",
+      "description": "Permit for building an accessory dwelling unit on residential property",
+      "typical_projects": ["Detached ADU", "Attached ADU", "Garage conversion ADU", "Junior ADU (JADU)"],
+      "required_forms": ["DS-345", "DS-560", "DS-530"],
+      "estimated_timeline": "60 days max for plan review (per state law)",
+      "fees": "Based on square footage and valuation, impact fees waived for ADUs under 750 sq ft",
+      "process": ["Pre-application consultation (recommended)", "Submit plans and application", "Plan review (60-day max)", "Permit issuance", "Construction with inspections", "Final inspection and certificate of occupancy"],
+      "special_notes": "California AB 2221 and SB 897 streamline ADU approvals. No owner-occupancy requirement. Setback requirements reduced to 4 feet for detached ADUs."
+    },
+    {
+      "id": "demolition_permit",
+      "name": "Demolition Permit",
+      "description": "Required for partial or complete demolition of structures",
+      "typical_projects": ["Complete building demolition", "Partial demolition", "Pool demolition", "Interior demolition"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "2-4 weeks",
+      "fees": "Based on square footage",
+      "process": ["Submit application", "Asbestos survey required", "Utility disconnections", "Plan review", "Permit issuance", "Inspections"]
+    },
+    {
+      "id": "grading_permit",
+      "name": "Grading Permit",
+      "description": "Required for earth-moving, excavation, or fill operations",
+      "typical_projects": ["Site preparation", "Retaining walls", "Hillside grading", "Drainage improvements"],
+      "required_forms": ["DS-345", "DS-164"],
+      "estimated_timeline": "6-12 weeks",
+      "fees": "Based on cubic yards of earth moved",
+      "process": ["Submit grading plans", "Engineering review", "Environmental review (if applicable)", "Permit issuance", "Inspections during grading", "Final compaction report"]
+    },
+    {
+      "id": "fence_permit",
+      "name": "Fence/Wall Permit",
+      "description": "Required for fences and walls exceeding height limits",
+      "typical_projects": ["Fences over 6 feet", "Retaining walls over 3 feet", "Front yard walls over 3 feet", "Pool barriers"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "2-4 weeks",
+      "fees": "Based on linear footage",
+      "process": ["Submit application with site plan", "Plan review", "Permit issuance", "Final inspection"]
+    },
+    {
+      "id": "traffic_control_permit",
+      "name": "Traffic Control Permit",
+      "description": "Required for work that affects public right-of-way or traffic flow",
+      "typical_projects": ["Street construction", "Utility work in right-of-way", "Special events", "Moving operations"],
+      "required_forms": ["Traffic control plan"],
+      "estimated_timeline": "1-2 weeks",
+      "fees": "Varies by duration and impact",
+      "process": ["Submit traffic control plan", "Review", "Permit issuance", "Implement traffic control", "Restore right-of-way"]
+    },
+    {
+      "id": "sign_permit",
+      "name": "Sign Permit",
+      "description": "Required for commercial signs, including wall signs, monument signs, and temporary signs",
+      "typical_projects": ["Business wall signs", "Monument signs", "Illuminated signs", "Temporary banners"],
+      "required_forms": ["DS-345"],
+      "estimated_timeline": "2-6 weeks",
+      "fees": "Based on sign area",
+      "process": ["Submit application with sign specs", "Plan review", "Permit issuance", "Installation", "Final inspection"]
+    }
+  ],
+  "processing_options": [
+    {
+      "name": "Rapid Review",
+      "description": "Expedited plan review for qualifying residential projects",
+      "eligible_projects": ["Simple residential additions", "Kitchen/bath remodels", "Re-roofing", "Solar installations"],
+      "timeline": "Same day to 3 business days",
+      "additional_fee": "50% surcharge on plan review fee"
+    },
+    {
+      "name": "Express Plan Check",
+      "description": "Faster plan review for commercial tenant improvements",
+      "eligible_projects": ["Commercial tenant improvements", "Minor commercial alterations"],
+      "timeline": "5-10 business days",
+      "additional_fee": "65% surcharge on plan review fee"
+    },
+    {
+      "name": "Expedite Program",
+      "description": "Priority processing for qualifying projects",
+      "eligible_projects": ["Large commercial projects", "Projects with demonstrated urgency"],
+      "timeline": "Varies, typically 50% faster than standard",
+      "additional_fee": "Varies by project"
+    }
+  ],
+  "required_forms": {
+    "DS-345": {
+      "name": "Application for Building Permit",
+      "description": "Standard permit application form for all building-related permits",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-345.pdf"
+    },
+    "DS-560": {
+      "name": "Plan Submittal Requirements",
+      "description": "Checklist of required plan sheets and details for plan review",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-560.pdf"
+    },
+    "DS-16": {
+      "name": "Owner-Builder Declaration",
+      "description": "Required when property owner acts as their own general contractor",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-16.pdf"
+    },
+    "DS-530": {
+      "name": "ADU Supplemental Application",
+      "description": "Additional information required for Accessory Dwelling Unit permits",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-530.pdf"
+    },
+    "DS-165": {
+      "name": "Grading Plan Requirements",
+      "description": "Requirements checklist for grading permit applications",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-165.pdf"
+    },
+    "DS-164": {
+      "name": "Grading Application",
+      "description": "Application form for grading permits",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-164.pdf"
+    },
+    "DS-4107": {
+      "name": "Inspection Request Form",
+      "description": "Form to schedule inspections during and after construction",
+      "url": "https://www.sandiego.gov/sites/default/files/ds-4107.pdf"
+    }
+  }
+}
