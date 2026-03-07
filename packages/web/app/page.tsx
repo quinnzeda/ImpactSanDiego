@@ -3,6 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { PermitRoadmap } from "./components/PermitRoadmap";
 import { QuestionsForm } from "./components/QuestionsForm";
+import { PermitVerdictCard } from "./components/PermitVerdictCard";
+import { PersonalizedChecklist } from "./components/PersonalizedChecklist";
+import { StatusTracker } from "./components/StatusTracker";
+import { PropertyCard } from "./components/PropertyCard";
+import { OptionsExplorer } from "./components/OptionsExplorer";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -187,6 +192,8 @@ export default function Home() {
           project_description: promptValue || `${situation} permit inquiry`,
           property_address:    address || undefined,
           include_questions:   situation !== "waiting",
+          situation,
+          category:            activeCategory || undefined,
         }),
       });
 
@@ -222,6 +229,8 @@ export default function Home() {
           project_description: promptValue || "permit inquiry",
           property_address:    address || undefined,
           answers,
+          situation:           activeSituation || undefined,
+          category:            activeCategory || undefined,
         }),
       });
       const data = await res.json();
@@ -242,6 +251,8 @@ export default function Home() {
       body: JSON.stringify({
         project_description: promptValue || "permit inquiry",
         property_address:    address || undefined,
+        situation:           activeSituation || undefined,
+        category:            activeCategory || undefined,
       }),
     })
       .then((r) => r.json())
@@ -268,6 +279,8 @@ export default function Home() {
         body: JSON.stringify({
           project_description: text,
           property_address:    address || undefined,
+          situation:           activeSituation || undefined,
+          category:            activeCategory || undefined,
         }),
       });
       const data = await res.json();
@@ -558,8 +571,13 @@ export default function Home() {
                 </div>
               )}
               {!loading && result && (
-                <div className="p-6">
-                  <PermitRoadmap data={result} projectDescription={promptValue || address} />
+                <div className="p-6 flex flex-col gap-4">
+                  <CanvasRouter
+                    result={result}
+                    activeSituation={activeSituation}
+                    projectDescription={promptValue || address}
+                    address={address}
+                  />
                 </div>
               )}
               {!loading && !questions && !result && (
@@ -572,6 +590,91 @@ export default function Home() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+// ── CanvasRouter ───────────────────────────────────────────────────────────────
+
+type Reliability = { source: "live" | "ai" | "fallback"; notes: string[] };
+
+function CanvasRouter({
+  result,
+  activeSituation,
+  projectDescription,
+  address,
+}: {
+  result: Record<string, unknown>;
+  activeSituation: Situation | null;
+  projectDescription: string;
+  address: string;
+}) {
+  const canvas = result.canvas as string | undefined;
+  const reliability = result.reliability as Reliability | undefined;
+  const hasProperty = result.property != null && typeof result.property === "object";
+
+  const effectiveCanvas =
+    canvas ||
+    (activeSituation === "planning"
+      ? "verdict"
+      : activeSituation === "applying"
+      ? "checklist"
+      : activeSituation === "waiting"
+      ? "status"
+      : "roadmap");
+
+  let primaryCard: React.ReactNode;
+
+  switch (effectiveCanvas) {
+    case "verdict":
+      primaryCard = (
+        <PermitVerdictCard
+          verdict={result.verdict as Record<string, unknown> | undefined}
+          estimated_timeline={result.estimated_timeline as string | undefined}
+          estimated_cost_range={result.estimated_cost_range as string | undefined}
+          reliability={reliability}
+        />
+      );
+      break;
+    case "checklist":
+      primaryCard = (
+        <PersonalizedChecklist
+          checklist={result.checklist as Record<string, unknown> | undefined}
+          reliability={reliability}
+          projectDescription={projectDescription}
+        />
+      );
+      break;
+    case "status":
+      primaryCard = (
+        <StatusTracker
+          status={result.status as Record<string, unknown> | undefined}
+          reliability={reliability}
+          address={address}
+        />
+      );
+      break;
+    case "options":
+      primaryCard = (
+        <OptionsExplorer
+          options={result.options as Record<string, unknown> | undefined}
+          reliability={reliability}
+        />
+      );
+      break;
+    default:
+      primaryCard = <PermitRoadmap data={result} projectDescription={projectDescription} />;
+  }
+
+  return (
+    <>
+      {hasProperty && (
+        <PropertyCard
+          property={result.property as Record<string, unknown> | undefined}
+          reliability={reliability}
+        />
+      )}
+      {primaryCard}
     </>
   );
 }
