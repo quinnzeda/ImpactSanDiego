@@ -1,47 +1,181 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PermitRoadmap } from "./components/PermitRoadmap";
 import { QuestionsForm } from "./components/QuestionsForm";
 
-interface Question {
-  id: string;
-  question: string;
-  why: string;
-  options?: string[];
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Situation = "planning" | "applying" | "waiting";
+type Category = "adu" | "kitchen-bath" | "room-addition" | "solar" | "deck-fence";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 interface QuestionsData {
   phase: "questions";
   project_summary: string;
-  questions: Question[];
+  questions: Array<{ id: string; question: string; why: string; options?: string[] }>;
   preliminary_assessment: string;
 }
 
+// ── Static data ───────────────────────────────────────────────────────────────
+
+const SITUATIONS: { id: Situation; label: string; sub: string }[] = [
+  { id: "planning", label: "Just starting to think about it", sub: "What's allowed, what it costs" },
+  { id: "applying", label: "Ready to apply for a permit",     sub: "Get the exact checklist" },
+  { id: "waiting",  label: "Waiting on a permit I filed",     sub: "Track status or decode a notice" },
+];
+
+const CATEGORIES: { id: Category; label: string }[] = [
+  { id: "adu",           label: "ADU" },
+  { id: "kitchen-bath",  label: "Kitchen or Bath" },
+  { id: "room-addition", label: "Room Addition" },
+  { id: "solar",         label: "Solar" },
+  { id: "deck-fence",    label: "Deck or Fence" },
+];
+
+const EXAMPLES: Record<string, Record<string, string[]> | string[]> = {
+  planning: {
+    adu:           ["Can I build a detached ADU on this lot?", "Can I convert my garage into an ADU here?", "What's the max ADU size allowed on this property?", "Do I need a coastal development permit for an ADU at this address?"],
+    "kitchen-bath":  ["Do I need a permit to open up a wall at this address?", "What's involved in adding a full bathroom to this property?", "Which parts of a kitchen remodel need a permit here?"],
+    "room-addition": ["What are the setback limits for a room addition on this lot?", "Can I add a second story to this property?", "Can I enclose my covered patio and turn it into living space here?"],
+    solar:           ["Do I need a permit to install solar panels at this address?", "Does adding battery storage to my existing solar need a separate permit?", "How does the streamlined solar permit process work for this property?"],
+    "deck-fence":    ["How high can I build a fence at this address without a permit?", "Do I need a permit to build a deck in my backyard here?", "Does a pergola or covered patio require a permit at this address?"],
+  },
+  applying: {
+    adu:           ["What do I need to submit to get an ADU permit for this address?", "Do I need a licensed architect, or can I use design-build plans?", "How long is the city's plan check taking for ADUs right now?"],
+    "kitchen-bath":  ["What's on the submittal checklist for a bathroom addition here?", "Does my contractor pull the permit or do I apply myself?", "What inspections will the city require during construction?"],
+    "room-addition": ["What do I need to submit for a room addition permit at this address?", "Can I start any work while my application is in plan check?", "What's the permit fee for a room addition at this property?"],
+    solar:           ["What do I need to submit for a solar permit at this address?", "Can my installer handle the permit application, or do I have to?", "How long does a solar permit take to approve for this property?"],
+    "deck-fence":    ["What's on the checklist to permit a deck at this address?", "Do I need a site plan showing property lines to apply?", "What inspections will the city do on the deck after it's built?"],
+  },
+  waiting: ["My permit says PENDNG-PLANCK — what does that mean?", "I got a correction letter and I don't understand what they're asking for", "It's been 10 weeks since I submitted — is that normal?", "My permit is about to expire — can I get an extension?", "I got a fee invoice and I don't understand the line items"],
+};
+
+const SUBMIT_LABELS: Record<Situation, string> = {
+  planning: "Check what's allowed",
+  applying: "Build my permit checklist",
+  waiting:  "Track my permit status",
+};
+
+const MODE_TAGS: Record<Situation, string> = {
+  planning: "What's allowed",
+  applying: "Permit checklist",
+  waiting:  "Permit tracker",
+};
+
+const FIRST_MESSAGES: Record<Situation, string> = {
+  planning: "Got it. Let me pull up what San Diego's zoning rules say for your area.",
+  applying: "Sure, let's get your checklist together. Give me a moment.",
+  waiting:  "I'll look that up. Give me a moment to check the city's system.",
+};
+
+const CANVAS_CONTENT: Record<Situation, { title: string; desc: string }> = {
+  planning: { title: "Zoning rules for your property",  desc: "What your lot allows, setback requirements, and what permits you'll need will show up here." },
+  applying: { title: "Your permit checklist",           desc: "Exactly what to submit, who reviews it, how long it takes, and what it costs." },
+  waiting:  { title: "Your permit status",              desc: "Current status, what each stage means, and what your next move is." },
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Home() {
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [questions, setQuestions] = useState<QuestionsData | null>(null);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"quick" | "detailed">("detailed");
+  // Landing state
+  const [activeSituation, setActiveSituation] = useState<Situation | null>(null);
+  const [activeCategory,  setActiveCategory]  = useState<Category | null>(null);
+  const [address,         setAddress]         = useState("");
+  const [promptValue,     setPromptValue]     = useState("");
+  const [examplesOpen,    setExamplesOpen]    = useState(false);
+  const [activeExample,   setActiveExample]   = useState<string | null>(null);
+  const [currentExamples, setCurrentExamples] = useState<string[]>([]);
 
-  const examples = [
-    "I want to build an ADU in my backyard",
-    "I need to replace my water heater",
-    "I want to install solar panels on my roof",
-    "I'm planning a kitchen remodel with new plumbing",
-    "I want to build a 6-foot fence around my yard",
-    "I want to convert my garage into a living space",
-  ];
+  // App state
+  const [appMode,    setAppMode]    = useState(false);
+  const [modeTag,    setModeTag]    = useState("");
+  const [messages,   setMessages]   = useState<ChatMessage[]>([]);
+  const [loading,    setLoading]    = useState(false);
+  const [questions,  setQuestions]  = useState<QuestionsData | null>(null);
+  const [result,     setResult]     = useState<Record<string, unknown> | null>(null);
+  const [chatInput,  setChatInput]  = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!description.trim()) return;
+  const promptRef      = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef   = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  function autoResize(el: HTMLTextAreaElement) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 180) + "px";
+  }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── Landing interactions ───────────────────────────────────────────────────
+
+  function handleSituationClick(sit: Situation) {
+    if (activeSituation === sit) {
+      setActiveSituation(null);
+      setActiveCategory(null);
+      setExamplesOpen(false);
+      setCurrentExamples([]);
+      return;
+    }
+    setActiveSituation(sit);
+    setActiveCategory(null);
+    if (sit === "waiting") {
+      setCurrentExamples(EXAMPLES.waiting as string[]);
+      setExamplesOpen(true);
+    } else {
+      setCurrentExamples([]);
+      setExamplesOpen(false);
+    }
+  }
+
+  function handleCategoryClick(cat: Category) {
+    if (!activeSituation || activeSituation === "waiting") return;
+    if (activeCategory === cat) {
+      setActiveCategory(null);
+      setExamplesOpen(false);
+      setCurrentExamples([]);
+      return;
+    }
+    setActiveCategory(cat);
+    const catExamples = (EXAMPLES[activeSituation] as Record<string, string[]>)[cat] || [];
+    setCurrentExamples(catExamples);
+    setExamplesOpen(true);
+  }
+
+  function handleExampleClick(text: string) {
+    setActiveExample(text);
+    setPromptValue(text);
+    setTimeout(() => {
+      if (promptRef.current) autoResize(promptRef.current);
+    }, 0);
+    if (!address.trim()) {
+      document.getElementById("addressInput")?.focus();
+    } else {
+      promptRef.current?.focus();
+    }
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    if (!address.trim() && !promptValue.trim()) return;
+
+    const situation = activeSituation || "planning";
+    const userMsg = [address, promptValue].filter(Boolean).join(" — ");
+
+    setModeTag(MODE_TAGS[situation]);
+    setMessages([
+      { role: "user",      content: userMsg },
+      { role: "assistant", content: FIRST_MESSAGES[situation] },
+    ]);
+    setAppMode(true);
     setLoading(true);
-    setError(null);
     setResult(null);
     setQuestions(null);
 
@@ -50,9 +184,9 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_description: description,
-          property_address: address || undefined,
-          include_questions: mode === "detailed",
+          project_description: promptValue || `${situation} permit inquiry`,
+          property_address:    address || undefined,
+          include_questions:   situation !== "waiting",
         }),
       });
 
@@ -60,12 +194,12 @@ export default function Home() {
       const data = await res.json();
 
       if (data.phase === "questions") {
-        setQuestions(data as QuestionsData);
+        setQuestions(data);
       } else {
         setResult(data);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -73,25 +207,27 @@ export default function Home() {
 
   async function handleAnswersSubmit(answers: Record<string, string>) {
     setLoading(true);
-    setError(null);
     setQuestions(null);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user",      content: "Here are my answers." },
+      { role: "assistant", content: "Perfect — generating your personalized roadmap now." },
+    ]);
 
     try {
       const res = await fetch("/api/navigate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_description: description,
-          property_address: address || undefined,
+          project_description: promptValue || "permit inquiry",
+          property_address:    address || undefined,
           answers,
         }),
       });
-
-      if (!res.ok) throw new Error("Failed to generate roadmap");
       const data = await res.json();
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -100,199 +236,422 @@ export default function Home() {
   function handleSkipQuestions() {
     setQuestions(null);
     setLoading(true);
-    setError(null);
-
     fetch("/api/navigate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        project_description: description,
-        property_address: address || undefined,
+        project_description: promptValue || "permit inquiry",
+        property_address:    address || undefined,
       }),
     })
-      .then((res) => res.json())
+      .then((r) => r.json())
       .then((data) => setResult(data))
-      .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong"))
+      .catch(console.error)
       .finally(() => setLoading(false));
   }
 
+  async function handleChatSend() {
+    const text = chatInput.trim();
+    if (!text) return;
+    setChatInput("");
+    if (chatInputRef.current) autoResize(chatInputRef.current);
+
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setLoading(true);
+    setResult(null);
+    setQuestions(null);
+
+    try {
+      const res = await fetch("/api/navigate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_description: text,
+          property_address:    address || undefined,
+        }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "assistant", content: "Got it — here's what I found." }]);
+      if (data.phase === "questions") {
+        setQuestions(data);
+      } else {
+        setResult(data);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleBack() {
+    setAppMode(false);
+    setMessages([]);
+    setResult(null);
+    setQuestions(null);
+    setLoading(false);
+  }
+
+  const submitLabel     = activeSituation ? SUBMIT_LABELS[activeSituation] : "Check what's allowed";
+  const showChips       = activeSituation === "planning" || activeSituation === "applying";
+  const canvasContent   = activeSituation ? CANVAS_CONTENT[activeSituation] : { title: "Your results will appear here", desc: "Property details, checklists, and cost estimates will appear here as we work through your project together." };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary-dark via-primary to-primary-light text-white py-16 px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
-            Navigate SD Permits
-            <br />
-            <span className="text-blue-200">with Confidence</span>
-          </h1>
-          <p className="text-lg text-blue-100 max-w-2xl mx-auto">
-            Describe your project in plain English and get a complete permit
-            roadmap. Powered by live Accela &amp; Socrata APIs and San Diego
-            Municipal Code.
-          </p>
+    <>
+      {/* ══════════════════ LANDING ══════════════════ */}
+      {!appMode && (
+        <div className="min-h-dvh flex flex-col bg-stone-50">
+
+          {/* Nav */}
+          <nav className="flex items-center justify-between px-[clamp(1.5rem,6vw,4rem)] py-5 shrink-0">
+            <a href="#" className="flex items-center gap-2.5 no-underline text-stone-900">
+              <div className="w-[34px] h-[34px] bg-sage-500 rounded-[10px] flex items-center justify-center shrink-0">
+                <HouseIcon />
+              </div>
+              <span className="font-serif text-[1.125rem] font-semibold tracking-[-0.01em]">Permit Buddy</span>
+            </a>
+            <span className="text-xs font-medium text-stone-600 bg-stone-100 border border-stone-200 px-3 py-1 rounded-full">
+              San Diego
+            </span>
+          </nav>
+
+          {/* Hero */}
+          <main className="flex-1 flex flex-col items-center px-[clamp(1.25rem,5vw,3rem)] py-4 pb-10">
+            <div className="w-full max-w-[700px] flex flex-col gap-7">
+
+              {/* Headline */}
+              <div className="flex flex-col gap-4">
+                <h1 className="font-serif text-[clamp(2rem,4vw,2.875rem)] font-semibold leading-[1.12] tracking-[-0.025em] text-stone-900">
+                  San Diego permit guidance<br />for residential projects.
+                </h1>
+                <p className="text-[clamp(0.9375rem,1.4vw,1rem)] leading-[1.7] text-stone-600">
+                  Know what is allowed on your lot, what documents you need, and how your application is moving — in plain English, before delays cost you time and money.
+                </p>
+              </div>
+
+              {/* Situation cards */}
+              <div>
+                <p className="text-[0.8125rem] font-semibold text-stone-500 tracking-[0.03em] uppercase mb-3">
+                  Where are you with your project?
+                </p>
+                <div className="grid grid-cols-3 gap-2.5 max-sm:grid-cols-1">
+                  {SITUATIONS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSituationClick(s.id)}
+                      className={`flex flex-col gap-1.5 px-4 py-3 bg-white border-[1.5px] rounded-[14px] text-left transition-all duration-[0.15s] ${
+                        activeSituation === s.id
+                          ? "border-sage-500 bg-sage-50 shadow-[0_0_0_3px_oklch(58%_0.105_158_/_0.10)]"
+                          : "border-stone-200 hover:border-sage-200 hover:bg-sage-50"
+                      }`}
+                    >
+                      <span className="text-[0.9375rem] font-semibold text-stone-900 leading-[1.3]">{s.label}</span>
+                      <span className="text-[0.75rem] text-stone-500 leading-[1.4]">{s.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Category chips */}
+              {showChips && (
+                <div className="flex flex-col gap-3 animate-fade-in">
+                  <span className="text-[0.75rem] font-medium text-stone-500 tracking-[0.05em] uppercase">
+                    {activeSituation === "applying" ? "What are you applying for?" : "What kind of project?"}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {CATEGORIES.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleCategoryClick(c.id)}
+                        className={`text-[0.875rem] font-medium px-4 py-[0.4375rem] border-[1.5px] rounded-full leading-none select-none transition-all duration-[0.15s] ${
+                          activeCategory === c.id
+                            ? "bg-sage-500 border-sage-500 text-white"
+                            : "bg-stone-100 border-stone-200 text-stone-700 hover:bg-sage-50 hover:border-sage-200 hover:text-sage-700"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Input card */}
+              <div className="flex flex-col gap-3 bg-white border-[1.5px] border-stone-200 rounded-[14px] p-[1.125rem] shadow-[0_2px_8px_oklch(22%_0.008_240_/_0.05)] transition-all duration-[0.18s] focus-within:border-sage-300 focus-within:shadow-[0_0_0_3px_oklch(58%_0.105_158_/_0.10),_0_2px_8px_oklch(22%_0.008_240_/_0.05)]">
+
+                {/* Address */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.75rem] font-medium text-stone-500 tracking-[0.04em] uppercase" htmlFor="addressInput">
+                    {activeSituation === "waiting" ? "Permit number or property address" : "Property address"}
+                  </label>
+                  <input
+                    id="addressInput"
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") promptRef.current?.focus(); }}
+                    placeholder={activeSituation === "waiting" ? "PDS2024-xxxxxx or 123 Main St, San Diego, CA" : "123 Main St, San Diego, CA"}
+                    autoComplete="street-address"
+                    className="w-full text-[0.9375rem] text-stone-900 bg-stone-50 border-[1.5px] border-stone-200 rounded-[10px] px-3.5 py-2.5 outline-none leading-[1.5] placeholder:text-stone-300 focus:border-sage-300 transition-colors duration-[0.15s]"
+                  />
+                </div>
+
+                <div className="h-px bg-stone-100" />
+
+                {/* Question */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.75rem] font-medium text-stone-500 tracking-[0.04em] uppercase" htmlFor="promptInput">
+                    {activeSituation === "applying" ? "What are you applying for?" : activeSituation === "waiting" ? "What are you seeing?" : "What do you want to know?"}
+                  </label>
+                  <textarea
+                    id="promptInput"
+                    ref={promptRef}
+                    value={promptValue}
+                    rows={2}
+                    onChange={(e) => { setPromptValue(e.target.value); autoResize(e.target); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
+                    placeholder="Type your question, or pick one below..."
+                    className="w-full min-h-[64px] max-h-[180px] resize-none text-[0.9375rem] text-stone-900 bg-stone-50 border-[1.5px] border-stone-200 rounded-[10px] px-3.5 py-2.5 outline-none leading-[1.55] placeholder:text-stone-300 focus:border-sage-300 transition-colors duration-[0.15s] overflow-y-auto"
+                  />
+
+                  {/* Example prompts (accordion) */}
+                  <div
+                    className="grid transition-[grid-template-rows] duration-[0.32s] ease-[cubic-bezier(0.16,1,0.3,1)]"
+                    style={{ gridTemplateRows: examplesOpen ? "1fr" : "0fr" }}
+                  >
+                    <div className="overflow-hidden">
+                      <span className="block text-[0.75rem] font-medium text-stone-500 tracking-[0.04em] uppercase pt-3 mb-2">
+                        Not sure where to start? Try one of these:
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 pb-1 max-sm:grid-cols-1">
+                        {currentExamples.map((ex, i) => (
+                          <button
+                            key={ex}
+                            type="button"
+                            onClick={() => handleExampleClick(ex)}
+                            style={{ animationDelay: `${i * 45}ms` }}
+                            className={`inline-flex items-start text-[0.8125rem] font-medium text-left px-3 py-[0.375rem] border-[1.5px] rounded-full leading-[1.3] transition-all duration-[0.15s] animate-fade-in ${
+                              activeExample === ex
+                                ? "bg-sage-100 border-sage-400 text-sage-700"
+                                : "bg-stone-100 border-stone-200 text-stone-700 hover:bg-sage-50 hover:border-sage-200 hover:text-sage-700"
+                            }`}
+                          >
+                            {ex}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <div className="flex flex-col gap-2 -mt-1.5">
+                <span className="text-[0.75rem] text-stone-300 text-center">⌘ + Return to submit</span>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="flex items-center justify-center gap-2 w-full text-[1.0625rem] font-semibold text-white bg-sage-500 border-none rounded-[10px] py-4 px-6 tracking-[-0.01em] transition-all duration-[0.16s] hover:bg-sage-600 hover:-translate-y-px active:translate-y-0 cursor-pointer"
+                >
+                  <span>{submitLabel}</span>
+                  <ArrowRight />
+                </button>
+              </div>
+
+            </div>
+          </main>
         </div>
-      </section>
+      )}
 
-      {/* Form */}
-      <section className="max-w-3xl mx-auto px-4 -mt-8">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl shadow-lg border border-border p-6 space-y-4"
-        >
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-foreground mb-2">
-              Describe Your Project
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., I want to build an ADU in my backyard at 1234 Elm St..."
-              rows={3}
-              className="w-full border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-            />
-          </div>
+      {/* ══════════════════ APP STATE ══════════════════ */}
+      {appMode && (
+        <div className="min-h-dvh flex flex-col">
 
-          <div>
-            <label htmlFor="address" className="block text-sm font-medium text-foreground mb-2">
-              Property Address <span className="text-muted font-normal">(optional)</span>
-            </label>
-            <input
-              id="address"
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="e.g., 1234 Elm St, San Diego, CA"
-              className="w-full border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-          </div>
-
-          {/* Mode Toggle */}
-          <div className="flex items-center gap-4">
+          {/* App nav */}
+          <nav className="flex items-center justify-between px-6 py-[0.875rem] border-b border-stone-200 bg-white shrink-0">
             <button
               type="button"
-              onClick={() => setMode("detailed")}
-              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
-                mode === "detailed"
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-muted border-border hover:border-primary"
-              }`}
+              onClick={handleBack}
+              className="flex items-center gap-1.5 text-[0.875rem] font-medium text-stone-600 bg-transparent border-none cursor-pointer py-1 hover:text-stone-900 transition-colors duration-[0.15s]"
             >
-              Detailed (with Q&amp;A)
+              <ArrowLeft />
+              Back
             </button>
-            <button
-              type="button"
-              onClick={() => setMode("quick")}
-              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
-                mode === "quick"
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-muted border-border hover:border-primary"
-              }`}
-            >
-              Quick Roadmap
-            </button>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading || !description.trim()}
-            className="w-full bg-primary text-white font-medium py-3 px-6 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="loading-dot" />
-                <span className="loading-dot" />
-                <span className="loading-dot" />
-                <span className="ml-2">Analyzing your project...</span>
-              </span>
-            ) : mode === "detailed" ? (
-              "Start Permit Assessment"
-            ) : (
-              "Get Quick Roadmap"
-            )}
-          </button>
-        </form>
+            <a href="#" className="flex items-center gap-2 no-underline text-stone-900">
+              <div className="w-7 h-7 bg-sage-500 rounded-[10px] flex items-center justify-center shrink-0">
+                <HouseIconSm />
+              </div>
+              <span className="font-serif text-base font-semibold tracking-[-0.01em]">Permit Buddy</span>
+            </a>
 
-        {/* Quick Examples */}
-        <div className="mt-6">
-          <p className="text-sm text-muted mb-3 text-center">Try an example:</p>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {examples.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => setDescription(ex)}
-                className="text-xs bg-surface hover:bg-surface-hover border border-border rounded-full px-3 py-1.5 text-muted hover:text-foreground transition-colors"
-              >
-                {ex}
-              </button>
-            ))}
+            <span className="text-[0.75rem] font-medium text-sage-700 bg-sage-100 border border-sage-200 px-3 py-1 rounded-full">
+              {modeTag}
+            </span>
+          </nav>
+
+          {/* Split layout */}
+          <div className="flex-1 grid grid-cols-[400px_1fr] overflow-hidden max-sm:grid-cols-1 max-sm:grid-rows-[1fr_1fr]">
+
+            {/* Chat panel */}
+            <div className="flex flex-col border-r border-stone-200 bg-white overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                    <div
+                      className={`text-[0.9375rem] leading-[1.55] px-4 py-3 rounded-[14px] max-w-[88%] ${
+                        msg.role === "user"
+                          ? "bg-sage-500 text-white rounded-br-[4px]"
+                          : "bg-stone-100 text-stone-900 rounded-bl-[4px]"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Chat input */}
+              <div className="flex gap-2.5 items-end p-4 border-t border-stone-200">
+                <textarea
+                  ref={chatInputRef}
+                  value={chatInput}
+                  rows={1}
+                  onChange={(e) => { setChatInput(e.target.value); autoResize(e.target); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); }
+                  }}
+                  placeholder="Ask a follow-up..."
+                  className="flex-1 text-[0.9375rem] text-stone-900 bg-stone-50 border-[1.5px] border-stone-200 rounded-[10px] px-3.5 py-2.5 resize-none outline-none min-h-[44px] max-h-[120px] leading-[1.5] placeholder:text-stone-300 focus:border-sage-300 transition-colors duration-[0.15s]"
+                />
+                <button
+                  type="button"
+                  onClick={handleChatSend}
+                  className="w-10 h-10 bg-sage-500 border-none rounded-[6px] flex items-center justify-center shrink-0 cursor-pointer hover:bg-sage-600 transition-colors duration-[0.15s]"
+                >
+                  <SendIcon />
+                </button>
+              </div>
+            </div>
+
+            {/* Canvas panel */}
+            <div className="bg-stone-50 overflow-y-auto flex flex-col">
+              {loading && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <CanvasLoading />
+                </div>
+              )}
+              {!loading && questions && (
+                <div className="p-6">
+                  <QuestionsForm
+                    data={questions}
+                    onSubmit={handleAnswersSubmit}
+                    onSkip={handleSkipQuestions}
+                    loading={loading}
+                  />
+                </div>
+              )}
+              {!loading && result && (
+                <div className="p-6">
+                  <PermitRoadmap data={result} projectDescription={promptValue || address} />
+                </div>
+              )}
+              {!loading && !questions && !result && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <CanvasEmpty title={canvasContent.title} desc={canvasContent.desc} />
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
-      </section>
-
-      {/* Error */}
-      {error && (
-        <section className="max-w-3xl mx-auto px-4 mt-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
-        </section>
       )}
+    </>
+  );
+}
 
-      {/* Q&A Phase */}
-      {questions && (
-        <section className="max-w-3xl mx-auto px-4 mt-8 animate-slide-up">
-          <QuestionsForm
-            data={questions}
-            onSubmit={handleAnswersSubmit}
-            onSkip={handleSkipQuestions}
-            loading={loading}
-          />
-        </section>
-      )}
+// ── Small components ──────────────────────────────────────────────────────────
 
-      {/* Results */}
-      {result && (
-        <section className="max-w-3xl mx-auto px-4 mt-8 animate-slide-up">
-          <PermitRoadmap data={result} projectDescription={description} />
-        </section>
-      )}
-
-      {/* Features */}
-      {!result && !questions && (
-        <section className="max-w-5xl mx-auto px-4 mt-16">
-          <div className="grid md:grid-cols-3 gap-6">
-            <FeatureCard
-              title="AI Permit Navigator"
-              description="Describe your project and get a personalized roadmap with Q&A refinement for precise guidance."
-              icon="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
-            <FeatureCard
-              title="Live Permit Search"
-              description="Search City (Accela API) and County (Socrata API) permit databases with real-time data."
-              icon="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-            <FeatureCard
-              title="Municipal Code Lookup"
-              description="Find building code sections, exemptions, height limits, parking requirements, and ADU regulations."
-              icon="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-            />
-          </div>
-        </section>
-      )}
+function CanvasLoading() {
+  return (
+    <div className="flex flex-col items-center gap-4 text-center">
+      <div className="w-12 h-12 bg-stone-100 rounded-[14px] flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(62% 0.016 75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" style={{ animationDuration: "1.8s" }}>
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+        </svg>
+      </div>
+      <div>
+        <p className="font-serif text-[1.125rem] font-semibold text-stone-900">Looking that up...</p>
+        <p className="text-[0.9375rem] text-stone-600 mt-1.5 leading-[1.6]">Pulling city data for your address</p>
+      </div>
     </div>
   );
 }
 
-function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
+function CanvasEmpty({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-6 hover:shadow-md transition-shadow">
-      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
-        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+    <div className="text-center max-w-[300px]">
+      <div className="w-[52px] h-[52px] bg-stone-100 rounded-[14px] flex items-center justify-center mx-auto mb-5">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(50% 0.014 75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18M9 21V9" />
         </svg>
       </div>
-      <h3 className="font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted leading-relaxed">{description}</p>
+      <h3 className="font-serif text-[1.125rem] font-semibold text-stone-900 mb-2">{title}</h3>
+      <p className="text-[0.9375rem] text-stone-600 leading-[1.6]">{desc}</p>
     </div>
+  );
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function HouseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function HouseIconSm() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function ArrowRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
+}
+
+function ArrowLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
   );
 }
