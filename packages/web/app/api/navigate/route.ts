@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getNavigationContext } from "../../lib/data-layer";
+import { lookupProperty, type PropertyLookupData } from "../property-lookup/route";
 
 type Situation = "planning" | "applying" | "waiting";
 type Category = "adu" | "kitchen-bath" | "room-addition" | "solar" | "deck-fence";
@@ -42,15 +43,40 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
+  // Fetch real property data when address is provided (runs for both phases)
+  let propertyData: PropertyLookupData | null = null;
+  if (property_address) {
+    try {
+      propertyData = await lookupProperty(property_address);
+    } catch (e) {
+      console.error("Property lookup error:", e);
+    }
+  }
+
   // Phase 1: Return clarifying questions
   if (include_questions && !answers) {
     if (apiKey) {
       try {
         const client = new Anthropic({ apiKey });
         const systemPrompt = getNavigationContext();
-        const userMsg = property_address
+        let userMsg = property_address
           ? `Project: ${project_description}\nProperty Address: ${property_address}`
           : `Project: ${project_description}`;
+
+        if (propertyData?.zone_code) {
+          userMsg += `\n\nProperty data already confirmed from public records:`;
+          userMsg += `\n- Zone: ${propertyData.zone_code} (${propertyData.zone_plain_english ?? ""})`;
+          if (propertyData.property_type) userMsg += `\n- Property type: ${propertyData.property_type}`;
+          if (propertyData.lot_size_sqft) userMsg += `\n- Lot size: ${propertyData.lot_size_sqft.toLocaleString()} sq ft`;
+          if (propertyData.year_built) userMsg += `\n- Year built: ${propertyData.year_built}`;
+          if (propertyData.is_coastal) userMsg += `\n- In Coastal Zone: YES`;
+          if (propertyData.is_historic) userMsg += `\n- In Historic District: YES`;
+          if (propertyData.overlays.length > 0) userMsg += `\n- Overlays: ${propertyData.overlays.join(", ")}`;
+          if (propertyData.past_permits.length > 0) {
+            userMsg += `\n- Past permits: ${propertyData.past_permits.map((p) => `${p.type} (${p.year ?? "?"}, ${p.status})`).join(", ")}`;
+          }
+          userMsg += `\n\nDo NOT ask about property type, historic district, or coastal zone — these are already known. Only ask questions about project-specific details the user must provide.`;
+        }
 
         const response = await client.messages.create({
           model: "claude-sonnet-4-20250514",
@@ -69,7 +95,12 @@ export async function POST(request: NextRequest) {
         const match = text.match(/\{[\s\S]*\}/);
         if (match) {
           try {
-            return NextResponse.json(JSON.parse(match[0]));
+            const parsed = JSON.parse(match[0]);
+            // Attach property data to questions phase so the frontend can show it immediately
+            if (propertyData && propertyData.data_sources.length > 0) {
+              parsed.property_preview = propertyData;
+            }
+            return NextResponse.json(parsed);
           } catch {
             /* fall through */
           }
@@ -78,7 +109,7 @@ export async function POST(request: NextRequest) {
         console.error("Questions generation error:", e);
       }
     }
-    return NextResponse.json(getFallbackQuestions(project_description));
+    return NextResponse.json(getFallbackQuestions(project_description, propertyData));
   }
 
   // Phase 2: Generate roadmap with canvas contract
@@ -101,6 +132,21 @@ export async function POST(request: NextRequest) {
 
       if (situation) userMsg += `\nUser situation: ${situation}`;
       if (category) userMsg += `\nProject category: ${category}`;
+
+      // Inject real property data into AI context
+      if (propertyData && propertyData.data_sources.length > 0) {
+        userMsg += `\n\nConfirmed property data (from public records — do not ask about these):`;
+        if (propertyData.zone_code) userMsg += `\n- Zone: ${propertyData.zone_code} (${propertyData.zone_plain_english ?? ""})`;
+        if (propertyData.property_type) userMsg += `\n- Property type: ${propertyData.property_type}`;
+        if (propertyData.lot_size_sqft) userMsg += `\n- Lot size: ${propertyData.lot_size_sqft.toLocaleString()} sq ft`;
+        if (propertyData.year_built) userMsg += `\n- Year built: ${propertyData.year_built}`;
+        userMsg += `\n- In Coastal Zone: ${propertyData.is_coastal ? "YES" : "NO"}`;
+        userMsg += `\n- In Historic District: ${propertyData.is_historic ? "YES" : "NO"}`;
+        if (propertyData.overlays.length > 0) userMsg += `\n- Special overlays: ${propertyData.overlays.join(", ")}`;
+        if (propertyData.past_permits.length > 0) {
+          userMsg += `\n- Past permits: ${propertyData.past_permits.map((p) => `${p.type} (${p.year ?? "?"}, ${p.status})`).join("; ")}`;
+        }
+      }
 
       const addressJson = property_address ? `"${String(property_address).replace(/"/g, '\\"')}"` : "null";
 
@@ -125,6 +171,16 @@ export async function POST(request: NextRequest) {
           if (!parsed.canvas) parsed.canvas = canvasType;
           if (!parsed.reliability)
             parsed.reliability = { source: "ai", notes: ["AI-generated guidance"] };
+          // Merge real property data over AI-guessed property fields
+          if (propertyData && propertyData.data_sources.length > 0) {
+            parsed.property = mergePropertyData(parsed.property, propertyData, property_address);
+            if (propertyData.is_coastal || propertyData.is_historic) {
+              parsed.reliability.notes = [
+                ...(parsed.reliability.notes ?? []),
+                ...propertyData.data_sources.map((s) => `Property data from: ${s}`),
+              ];
+            }
+          }
           return NextResponse.json(parsed);
         } catch {
           /* fall through */
@@ -141,13 +197,35 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    getFallbackNavigation(project_description, answers, situation, category)
+    getFallbackNavigation(project_description, answers, situation, category, propertyData)
   );
 }
 
-function getFallbackQuestions(description: string) {
+// Merge confirmed ArcGIS/Socrata property data over AI-guessed property fields
+function mergePropertyData(
+  aiProperty: Record<string, unknown> | undefined,
+  real: PropertyLookupData,
+  rawAddress?: string
+): Record<string, unknown> {
+  const base = aiProperty ?? {};
+  return {
+    ...base,
+    address: real.address ?? rawAddress ?? base.address,
+    apn: real.apn ?? base.apn ?? null,
+    zone_code: real.zone_code ?? base.zone_code ?? null,
+    zone_plain_english: real.zone_plain_english ?? base.zone_plain_english ?? null,
+    lot_size_sqft: real.lot_size_sqft ?? base.lot_size_sqft ?? null,
+    overlays: real.overlays.length > 0 ? real.overlays : (base.overlays ?? []),
+    past_permits: real.past_permits.length > 0 ? real.past_permits : (base.past_permits ?? []),
+  };
+}
+
+function getFallbackQuestions(description: string, property?: PropertyLookupData | null) {
   const desc = description.toLowerCase();
   const questions: Array<{ id: string; question: string; why: string; options?: string[] }> = [];
+  // Questions we can skip because we already have the answer from property lookup
+  const knownPropertyType = !!property?.property_type && property.property_type !== "unknown";
+  const knownHistoric = property != null; // if we ran lookup, we know one way or another
 
   if (desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny")) {
     questions.push(
@@ -174,17 +252,24 @@ function getFallbackQuestions(description: string) {
     );
   }
 
-  questions.push(
-    { id: "q_property_type", question: "Property type?", why: "Different requirements by property type", options: ["Single-family", "Multi-family", "Commercial"] },
-    { id: "q_historic", question: "In a historic district?", why: "May need HRB review", options: ["No", "Yes", "Not sure"] },
-  );
+  // Only ask property type / historic if we couldn't determine them from the address lookup
+  if (!knownPropertyType) {
+    questions.push({ id: "q_property_type", question: "Property type?", why: "Different requirements by property type", options: ["Single-family", "Multi-family", "Commercial"] });
+  }
+  if (!knownHistoric) {
+    questions.push({ id: "q_historic", question: "In a historic district?", why: "May need HRB review", options: ["No", "Yes", "Not sure"] });
+  }
 
-  return {
+  const result: Record<string, unknown> = {
     phase: "questions",
     project_summary: description,
     questions,
     preliminary_assessment: getPreliminaryAssessment(desc),
   };
+  if (property && property.data_sources.length > 0) {
+    result.property_preview = property;
+  }
+  return result;
 }
 
 function getPreliminaryAssessment(desc: string): string {
@@ -199,7 +284,8 @@ function getFallbackNavigation(
   description: string,
   answers?: Record<string, string>,
   situation?: Situation,
-  category?: Category
+  category?: Category,
+  property?: PropertyLookupData | null
 ) {
   const desc = description.toLowerCase();
   const canvas = selectCanvas(situation, category, description);
@@ -448,6 +534,11 @@ function getFallbackNavigation(
           "Project scope and location determine exact requirements. Contact DSD for pre-application guidance.",
       };
     }
+  }
+
+  // Merge real property data if available
+  if (property && property.data_sources.length > 0) {
+    result.property = mergePropertyData(undefined, property, description);
   }
 
   // Status fallback — applies when situation === "waiting"
