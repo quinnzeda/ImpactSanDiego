@@ -14,6 +14,7 @@ PermitPal SD provides two access points to demystify the permit process:
 
 1. **MCP Server** (13 tools) - Claude Code/Desktop users can query SD permit data conversationally
 2. **Next.js Web App** (WIP) - Interactive UI with AI-powered Q&A flow for precise permit roadmaps
+3. **index.html** - Flow demo
 
 ## Features
 
