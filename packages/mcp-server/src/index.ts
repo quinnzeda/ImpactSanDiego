@@ -7,6 +7,7 @@ import { navigatePermitsSchema, handleNavigatePermits } from "./tools/permit-nav
 import { codeLookupSchema, handleCodeLookup } from "./tools/code-lookup.js";
 import { checkExemptionSchema, handleCheckExemption } from "./tools/compliance-check.js";
 import { estimateCostSchema, handleEstimateCost } from "./tools/cost-estimator.js";
+import { buildingPlansGuideSchema, handleBuildingPlansGuide } from "./tools/building-plans-guide.js";
 import { socrataSearch, socrataGetStats } from "./data/socrata-client.js";
 import {
   validateAccelaConnection,
@@ -452,6 +453,18 @@ server.tool(
   }
 );
 
+// ── Tool 13: Building Plans Guide ──
+
+server.tool(
+  "get_building_plans_guide",
+  "Get a personalized guide for obtaining existing building floor plans for a San Diego property. Determines if your project needs existing plans, looks up permit history and property data, and provides step-by-step instructions for requesting plan copies from the City of San Diego DSD or San Diego County PDS. Covers appointment scheduling, Plan Duplication Application process, copyright requirements, and alternatives if plans aren't on file.",
+  buildingPlansGuideSchema.shape,
+  async (input) => {
+    const result = await handleBuildingPlansGuide(input);
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
 // ── Start server ──
 
 async function main() {
@@ -469,7 +482,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("PermitPal SD MCP Server v3.0 running on stdio (12 tools)");
+  console.error("PermitPal SD MCP Server v3.0 running on stdio (13 tools)");
 }
 
 main().catch((err) => {
