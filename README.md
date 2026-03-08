@@ -12,7 +12,7 @@ San Diego's building permit process is opaque and complex. Residents and develop
 
 PermitPal SD provides two access points to demystify the permit process:
 
-1. **MCP Server** (12 tools) - Claude Code/Desktop users can query SD permit data conversationally
+1. **MCP Server** (13 tools) - Claude Code/Desktop users can query SD permit data conversationally
 2. **Next.js Web App** - Interactive UI with AI-powered Q&A flow for precise permit roadmaps
 
 ## Features
@@ -26,6 +26,7 @@ PermitPal SD provides two access points to demystify the permit process:
 - **Property Zoning Lookup**: Look up zoning designation, overlays, and parcel data for any SD address via ArcGIS
 - **Project Cost Estimator**: Get itemized cost breakdowns for home improvement projects with SD market data
 - **Permit Detail Lookup**: Look up specific City of San Diego permits by record ID or address
+- **Building Plans Guide**: Personalized step-by-step guide for obtaining existing floor plans from City DSD or County PDS
 
 ## Data Sources
 
@@ -43,7 +44,7 @@ PermitPal SD provides two access points to demystify the permit process:
 ```
 permitpal-sd/
 ├── packages/
-│   ├── mcp-server/           # MCP Server (TypeScript) - 12 tools
+│   ├── mcp-server/           # MCP Server (TypeScript) - 13 tools
 │   │   ├── src/
 │   │   │   ├── index.ts      # Server entry + all tool registrations
 │   │   │   ├── tools/        # Tool implementations
@@ -66,7 +67,7 @@ permitpal-sd/
 └── scripts/                  # Data fetch utilities
 ```
 
-## MCP Server Tools (12 total)
+## MCP Server Tools (13 total)
 
 | Tool | Description | Data Source |
 |------|-------------|-------------|
@@ -82,6 +83,7 @@ permitpal-sd/
 | `search_parcels` | Search parcel data by APN, owner, or address | Accela API |
 | `lookup_property_zoning` | Look up zoning, overlays, and parcel data for an address | SD ArcGIS |
 | `estimate_project_cost` | Itemized cost estimate for home improvement projects | SD market data |
+| `get_building_plans_guide` | Guide for obtaining existing floor plans (DSD/PDS process) | ArcGIS + Accela + Socrata |
 
 ## Quick Start
 
@@ -114,6 +116,7 @@ claude mcp add permitpal -- node /path/to/permitpal-sd/packages/mcp-server/dist/
 # "What's the zoning for 4225 Park Blvd, San Diego?"
 # "How much would it cost to build an ADU?"
 # "What are the permit exemptions in San Diego?"
+# "How do I get existing floor plans for my house at 123 Main St?"
 ```
 
 ### Environment Variables
