@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   if (include_questions && !answers) {
     if (apiKey) {
       try {
-        const client = new Anthropic({ apiKey });
+        const client = new Anthropic({ apiKey, timeout: 15000, maxRetries: 0 });
         const systemPrompt = getNavigationContext();
         let userMsg = property_address
           ? `Project: ${project_description}\nProperty Address: ${property_address}`
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
   if (apiKey) {
     try {
-      const client = new Anthropic({ apiKey });
+      const client = new Anthropic({ apiKey, timeout: 50000, maxRetries: 0 });
       const systemPrompt = getNavigationContext();
       let userMsg = property_address
         ? `Project: ${project_description}\nProperty Address: ${property_address}`
@@ -148,16 +148,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const addressJson = property_address ? `"${String(property_address).replace(/"/g, '\\"')}"` : "null";
+      // Build a focused prompt based on canvas type — avoid requesting ALL fields
+      const coreFields = `"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"..."}],"process_steps":["step 1","step 2"],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."]`;
+      const verdictField = `"verdict":{"level":"green|amber|red","headline":"one sentence","reason":"2-3 sentences","what_changes_everything":"key factor"}`;
 
       const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 3000,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1500,
         system: systemPrompt,
         messages: [
           {
             role: "user",
-            content: `Provide a complete San Diego permit roadmap with canvas card data.\n\n${userMsg}\n\nRespond ONLY with valid JSON. Include ALL top-level fields:\n{"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"...","purpose":"..."}],"process_steps":["..."],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."],"special_considerations":["..."],"confidence":"high|medium|low","code_references":["§xxx - desc"],"canvas":"${canvasType}","reliability":{"source":"ai","notes":["AI-generated based on San Diego Municipal Code"]},"verdict":{"level":"green|amber|red","headline":"one sentence verdict","reason":"2-3 sentence explanation","what_changes_everything":"key factor that changes the answer"},"checklist":{"items":[{"id":"c1","label":"...","description":"...","required":true,"category":"documents|plans|fees|inspections"}]},"status":{"permit_number":null,"plain_english_status":"...","stage_description":"...","next_step":"...","workflow_steps":[{"label":"...","status":"done|active|pending"}]},"property":{"address":${addressJson},"zone_code":"...","zone_plain_english":"...","overlays":[],"lot_size_sqft":null,"apn":null,"past_permits":[]},"options":{"adu_types":[{"id":"detached","label":"Detached ADU","description":"...","pros":["..."],"cons":["..."]}],"default_type":"detached","size_range":{"min":150,"max":1200,"default":600}}}`,
+            content: `Provide a concise San Diego permit roadmap.\n\n${userMsg}\n\nRespond ONLY with valid JSON:\n{${coreFields},${verdictField},"canvas":"${canvasType}"}`,
           },
         ],
       });
@@ -297,14 +299,13 @@ function getFallbackNavigation(
     process_steps: [] as string[],
     estimated_timeline: "",
     tips: [] as string[],
-    note: answers ? "Roadmap refined with your answers." : "Set ANTHROPIC_API_KEY for AI-powered analysis.",
+    note: answers ? "Roadmap refined with your answers." : "Based on San Diego Municipal Code and state ADU law.",
     canvas,
     reliability: {
       source: "fallback",
       notes: [
-        answers
-          ? "Rule-based roadmap refined with your answers."
-          : "Set ANTHROPIC_API_KEY for AI-powered analysis.",
+        "Rule-based estimate using San Diego Municipal Code data.",
+        "AI analysis was temporarily unavailable.",
         "Contact DSD at (619) 446-5000 to confirm current requirements.",
       ],
     },
