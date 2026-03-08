@@ -222,14 +222,36 @@ ${faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}
 ## Key Forms:
 ${Object.entries(knowledge.required_forms).map(([id, f]) => `- **${id}** (${f.name}): ${f.description}`).join("\n")}
 
-## ADU Special Rules:
-- One ADU + one JADU allowed on most single-family lots
+## ADU Rules by Zone Type:
+
+### Single-Family Zones (RS, RE, RX):
+- One ADU + one JADU allowed per lot
 - Detached ADU: up to 1,200 sq ft, 16 feet height, 4-foot setbacks
-- JADU: up to 500 sq ft, within existing structure
-- 60-day ministerial approval timeline
-- No impact fees under 750 sq ft
+- Attached ADU: up to 50% of existing living area or 1,200 sq ft (whichever is less)
+- JADU: up to 500 sq ft, within existing structure footprint
+- 60-day ministerial approval timeline (state mandate)
+- No impact fees under 750 sq ft (SB 13)
 - No owner-occupancy requirement
 - No parking required within 1/2 mile of transit
+
+### Multi-Family Zones (RM, RT, RV):
+- ADUs allowed by converting existing non-livable space (laundry rooms, storage, boiler rooms)
+- At least one detached ADU up to 800 sq ft is always allowed regardless of lot size
+- Additional detached ADUs allowed up to 25% of existing unit count (minimum 1)
+- Detached ADUs: 16 feet height, 4-foot setbacks
+- JADUs do NOT apply to multi-family properties
+- 60-day ministerial approval timeline
+- No impact fees under 750 sq ft
+- No parking required within 1/2 mile of transit
+
+### Commercial Zones (CC, CX, CN, CV, CO, CR, CT):
+- Traditional ADUs are NOT permitted in commercial zones
+- Mixed-use projects may allow residential units through different permit pathways
+
+### Industrial Zones (IP, IL, IS):
+- ADUs are NOT permitted in industrial zones
+
+IMPORTANT: When zoning data is provided in the user's message, use it to determine which ADU rules apply. If the property is in a commercial or industrial zone, clearly state that ADUs are not permitted and suggest alternatives.
 
 When a user describes their project, analyze it and provide:
 1. What permits they likely need (with form numbers)

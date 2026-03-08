@@ -1,6 +1,8 @@
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { getNavigationContext } from "../data/permit-knowledge.js";
+import { lookupPropertyZoning } from "../data/property-lookup.js";
+import { checkAduEligibility, AduEligibility } from "../data/adu-eligibility.js";
 
 export const navigatePermitsSchema = z.object({
   project_description: z.string().describe("Plain-English description of the project (e.g., 'I want to build an ADU in my backyard')"),
@@ -11,45 +13,97 @@ export const navigatePermitsSchema = z.object({
 
 export type NavigatePermitsInput = z.infer<typeof navigatePermitsSchema>;
 
+function isAduProject(description: string): boolean {
+  const desc = description.toLowerCase();
+  return desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny flat") || desc.includes("in-law");
+}
+
+function formatZoningContext(eligibility: AduEligibility): string {
+  const lines = [
+    `\nZONING DATA (verified via City of San Diego ArcGIS):`,
+    `- Zone: ${eligibility.zone_code} (${eligibility.zone_description})`,
+    `- Property Type: ${eligibility.property_type}`,
+    `- ADU Eligibility: ${eligibility.eligible ? "eligible" : "NOT eligible"}`,
+    `- Details: ${eligibility.message}`,
+  ];
+  if (eligibility.rules.length > 0) {
+    lines.push(`- Applicable Rules: ${eligibility.rules.join("; ")}`);
+  }
+  if (eligibility.warnings.length > 0) {
+    lines.push(`- Warnings: ${eligibility.warnings.join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
 export async function handleNavigatePermits(input: NavigatePermitsInput): Promise<string> {
+  // Check ADU eligibility via zoning when address is provided
+  let aduEligibility: AduEligibility | null = null;
+  if (isAduProject(input.project_description) && input.property_address) {
+    try {
+      const zoning = await lookupPropertyZoning(input.property_address);
+      if (zoning.zone_code) {
+        aduEligibility = checkAduEligibility(zoning);
+      }
+    } catch {
+      // Continue without zoning data
+    }
+  }
+
+  // Short-circuit: if property is clearly ineligible for ADU
+  if (aduEligibility && !aduEligibility.eligible) {
+    return JSON.stringify({
+      zoning_check: {
+        zone_code: aduEligibility.zone_code,
+        zone_description: aduEligibility.zone_description,
+        property_type: aduEligibility.property_type,
+        adu_eligible: false,
+      },
+      result: aduEligibility.message,
+      alternatives: aduEligibility.alternatives,
+      recommendation: "Based on the zoning for this address, a traditional ADU is not permitted here. See alternatives above.",
+    }, null, 2);
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    // If they asked for questions, provide generic ones
     if (input.include_questions && !input.answers) {
-      return JSON.stringify(getQuestionsForProject(input.project_description), null, 2);
+      return JSON.stringify(getQuestionsForProject(input.project_description, aduEligibility), null, 2);
     }
-    return getFallbackNavigation(input);
+    return getFallbackNavigation(input, aduEligibility);
   }
 
   try {
     const client = new Anthropic({ apiKey });
     const systemPrompt = getNavigationContext();
 
-    // Phase 1: Generate clarifying questions
     if (input.include_questions && !input.answers) {
-      return await generateQuestions(client, systemPrompt, input);
+      return await generateQuestions(client, systemPrompt, input, aduEligibility);
     }
 
-    // Phase 2: Generate roadmap (with or without answers)
-    return await generateRoadmap(client, systemPrompt, input);
+    return await generateRoadmap(client, systemPrompt, input, aduEligibility);
   } catch (error) {
     console.error("Claude API error:", error);
     if (input.include_questions && !input.answers) {
-      return JSON.stringify(getQuestionsForProject(input.project_description), null, 2);
+      return JSON.stringify(getQuestionsForProject(input.project_description, aduEligibility), null, 2);
     }
-    return getFallbackNavigation(input);
+    return getFallbackNavigation(input, aduEligibility);
   }
 }
 
 async function generateQuestions(
   client: Anthropic,
   systemPrompt: string,
-  input: NavigatePermitsInput
+  input: NavigatePermitsInput,
+  aduEligibility: AduEligibility | null,
 ): Promise<string> {
-  const userMessage = input.property_address
+  let userMessage = input.property_address
     ? `Project: ${input.project_description}\nProperty Address: ${input.property_address}`
     : `Project: ${input.project_description}`;
+
+  if (aduEligibility) {
+    userMessage += formatZoningContext(aduEligibility);
+  }
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",
@@ -87,18 +141,22 @@ Respond ONLY with valid JSON (no markdown):
       return JSON.stringify(JSON.parse(jsonMatch[0]), null, 2);
     } catch { /* fall through */ }
   }
-  // Fallback to rule-based questions
-  return JSON.stringify(getQuestionsForProject(input.project_description), null, 2);
+  return JSON.stringify(getQuestionsForProject(input.project_description, aduEligibility), null, 2);
 }
 
 async function generateRoadmap(
   client: Anthropic,
   systemPrompt: string,
-  input: NavigatePermitsInput
+  input: NavigatePermitsInput,
+  aduEligibility: AduEligibility | null,
 ): Promise<string> {
   let userMessage = input.property_address
     ? `Project: ${input.project_description}\nProperty Address: ${input.property_address}`
     : `Project: ${input.project_description}`;
+
+  if (aduEligibility) {
+    userMessage += formatZoningContext(aduEligibility);
+  }
 
   if (input.answers && Object.keys(input.answers).length > 0) {
     userMessage += "\n\nAdditional details from Q&A:\n";
@@ -143,43 +201,59 @@ async function generateRoadmap(
 
 // ── Fallback rule-based functions ──
 
-function getQuestionsForProject(description: string): {
+function getQuestionsForProject(
+  description: string,
+  aduEligibility: AduEligibility | null,
+): {
   phase: string;
   project_summary: string;
   questions: Array<{ id: string; question: string; why: string; options?: string[] }>;
   preliminary_assessment: string;
+  zoning_check?: { zone_code: string | undefined; property_type: string | undefined; adu_eligible: boolean };
 } {
   const desc = description.toLowerCase();
 
-  const baseQuestions = [
-    {
-      id: "q_property_type",
-      question: "Is this a single-family home, multi-family, or commercial property?",
-      why: "Different property types have different permit requirements and review processes",
-      options: ["Single-family home", "Multi-family (2-4 units)", "Multi-family (5+ units)", "Commercial"],
-    },
-    {
-      id: "q_zone",
-      question: "Do you know your property's zoning designation? (e.g., RS-1-7, RM-1-1, CC-3-5)",
-      why: "Zoning determines setback requirements, height limits, and allowed uses",
-      options: ["I don't know", "RS (Residential Single)", "RM (Residential Multi)", "Commercial zone", "Other"],
-    },
-    {
-      id: "q_historic",
-      question: "Is your property in a historic district or designated as a historic resource?",
-      why: "Historic properties may need Historic Resources Board review even for exempt work",
-      options: ["No", "Yes", "I'm not sure"],
-    },
-  ];
+  // Base questions — skip zoning/property-type questions if we already looked them up
+  const baseQuestions: Array<{ id: string; question: string; why: string; options?: string[] }> = [];
+  if (!aduEligibility) {
+    baseQuestions.push(
+      {
+        id: "q_property_type",
+        question: "Is this a single-family home, multi-family, or commercial property?",
+        why: "Different property types have different permit requirements and review processes",
+        options: ["Single-family home", "Multi-family (2-4 units)", "Multi-family (5+ units)", "Commercial"],
+      },
+      {
+        id: "q_zone",
+        question: "Do you know your property's zoning designation? (e.g., RS-1-7, RM-1-1, CC-3-5)",
+        why: "Zoning determines setback requirements, height limits, and allowed uses",
+        options: ["I don't know", "RS (Residential Single)", "RM (Residential Multi)", "Commercial zone", "Other"],
+      },
+    );
+  }
+  baseQuestions.push({
+    id: "q_historic",
+    question: "Is your property in a historic district or designated as a historic resource?",
+    why: "Historic properties may need Historic Resources Board review even for exempt work",
+    options: ["No", "Yes", "I'm not sure"],
+  });
 
   const specificQuestions: Array<{ id: string; question: string; why: string; options?: string[] }> = [];
 
   if (desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny flat")) {
-    specificQuestions.push(
-      { id: "q_adu_type", question: "What type of ADU? Detached new construction, attached addition, or garage conversion?", why: "Each ADU type has different requirements for setbacks, size limits, and parking", options: ["Detached (new build)", "Attached (addition)", "Garage conversion", "Junior ADU (within existing home)"] },
-      { id: "q_adu_size", question: "What approximate square footage are you planning?", why: "Units under 750 sq ft are exempt from impact fees. Max is 1,200 sq ft for detached.", options: ["Under 500 sq ft", "500-750 sq ft", "750-1,000 sq ft", "1,000-1,200 sq ft"] },
-      { id: "q_transit", question: "Is the property within 1/2 mile of a public transit stop?", why: "No parking replacement required for ADUs near transit", options: ["Yes", "No", "I'm not sure"] },
-    );
+    if (aduEligibility?.eligibility_type === "multi-family") {
+      specificQuestions.push(
+        { id: "q_adu_type", question: "What type of ADU are you considering?", why: "Multi-family properties have specific rules for ADU types", options: ["Convert non-livable space (storage, laundry, etc.)", "Detached new construction", "Attached addition"] },
+        { id: "q_existing_units", question: "How many existing dwelling units are on the property?", why: "The number of allowed detached ADUs is based on 25% of existing units (minimum 1)", options: ["2-4 units", "5-10 units", "11-20 units", "20+ units"] },
+        { id: "q_adu_size", question: "What approximate square footage are you planning?", why: "Units under 750 sq ft are exempt from impact fees.", options: ["Under 500 sq ft", "500-750 sq ft", "750-800 sq ft", "Over 800 sq ft"] },
+      );
+    } else {
+      specificQuestions.push(
+        { id: "q_adu_type", question: "What type of ADU? Detached new construction, attached addition, or garage conversion?", why: "Each ADU type has different requirements for setbacks, size limits, and parking", options: ["Detached (new build)", "Attached (addition)", "Garage conversion", "Junior ADU (within existing home)"] },
+        { id: "q_adu_size", question: "What approximate square footage are you planning?", why: "Units under 750 sq ft are exempt from impact fees. Max is 1,200 sq ft for detached.", options: ["Under 500 sq ft", "500-750 sq ft", "750-1,000 sq ft", "1,000-1,200 sq ft"] },
+        { id: "q_transit", question: "Is the property within 1/2 mile of a public transit stop?", why: "No parking replacement required for ADUs near transit", options: ["Yes", "No", "I'm not sure"] },
+      );
+    }
   } else if (desc.includes("solar") || desc.includes("photovoltaic")) {
     specificQuestions.push(
       { id: "q_solar_size", question: "What is the system size in kW?", why: "Affects fee calculation and review process" },
@@ -199,16 +273,38 @@ function getQuestionsForProject(description: string): {
     );
   }
 
-  return {
+  const result: {
+    phase: string;
+    project_summary: string;
+    questions: Array<{ id: string; question: string; why: string; options?: string[] }>;
+    preliminary_assessment: string;
+    zoning_check?: { zone_code: string | undefined; property_type: string | undefined; adu_eligible: boolean };
+  } = {
     phase: "questions",
     project_summary: `Project: ${description}`,
     questions: [...specificQuestions, ...baseQuestions],
-    preliminary_assessment: getPreliminaryAssessment(desc),
+    preliminary_assessment: getPreliminaryAssessment(desc, aduEligibility),
   };
+
+  if (aduEligibility) {
+    result.zoning_check = {
+      zone_code: aduEligibility.zone_code,
+      property_type: aduEligibility.property_type,
+      adu_eligible: aduEligibility.eligible,
+    };
+  }
+
+  return result;
 }
 
-function getPreliminaryAssessment(desc: string): string {
+function getPreliminaryAssessment(desc: string, aduEligibility: AduEligibility | null): string {
   if (desc.includes("adu") || desc.includes("accessory dwelling")) {
+    if (aduEligibility?.eligibility_type === "multi-family") {
+      return `This property is zoned ${aduEligibility.zone_code} (${aduEligibility.zone_description}). Multi-family properties can add ADUs by converting non-livable space or building detached units (up to 25% of existing unit count). Different rules apply compared to single-family ADUs.`;
+    }
+    if (aduEligibility?.eligibility_type === "single-family") {
+      return `This property is zoned ${aduEligibility.zone_code} (${aduEligibility.zone_description}) and is eligible for an ADU. One ADU + one JADU allowed. California state law requires 60-day processing.`;
+    }
     return "This likely requires an ADU Permit with plan review. California state law requires 60-day processing. We need more details about the type and size to give specific guidance.";
   }
   if (desc.includes("solar") || desc.includes("photovoltaic")) {
@@ -223,7 +319,7 @@ function getPreliminaryAssessment(desc: string): string {
   return "Most construction work requires a building permit. We need more details to determine the specific permit type and process.";
 }
 
-function getFallbackNavigation(input: NavigatePermitsInput): string {
+function getFallbackNavigation(input: NavigatePermitsInput, aduEligibility: AduEligibility | null): string {
   const desc = input.project_description.toLowerCase();
   const result: {
     permits_needed: Array<{ type: string; name: string; reason: string }>;
@@ -233,6 +329,7 @@ function getFallbackNavigation(input: NavigatePermitsInput): string {
     estimated_timeline: string;
     tips: string[];
     note: string;
+    zoning_check?: { zone_code: string | undefined; property_type: string | undefined; adu_eligible: boolean };
   } = {
     permits_needed: [],
     exemptions: [],
@@ -243,13 +340,37 @@ function getFallbackNavigation(input: NavigatePermitsInput): string {
     note: "This is a basic analysis. For AI-powered detailed guidance, set ANTHROPIC_API_KEY environment variable.",
   };
 
+  if (aduEligibility) {
+    result.zoning_check = {
+      zone_code: aduEligibility.zone_code,
+      property_type: aduEligibility.property_type,
+      adu_eligible: aduEligibility.eligible,
+    };
+  }
+
   if (desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny flat") || desc.includes("in-law")) {
     result.permits_needed.push({ type: "adu_permit", name: "ADU Permit", reason: "Required for accessory dwelling unit construction" });
     result.forms_required.push({ form_id: "DS-530", name: "ADU Supplemental Application" });
     result.forms_required.push({ form_id: "DS-560", name: "Plan Submittal Requirements" });
     result.estimated_timeline = "60 days maximum for plan review (state mandate)";
     result.process_steps = ["Pre-application consultation (recommended)", "Prepare plans per DS-560 requirements", "Submit DS-345, DS-530, and plans", "Plan review (60-day max)", "Permit issuance", "Construction with inspections", "Final inspection and certificate of occupancy"];
-    result.tips = ["No impact fees for ADUs under 750 sq ft", "4-foot setbacks for detached ADUs", "No parking required within 1/2 mile of transit", "Maximum 1,200 sq ft for detached ADU"];
+
+    if (aduEligibility?.eligibility_type === "multi-family") {
+      result.tips = [
+        "Multi-family ADUs: convert non-livable space (storage, laundry, etc.) or build detached",
+        "At least one 800 sq ft detached ADU is always allowed",
+        "Additional detached ADUs up to 25% of existing unit count",
+        "JADUs do not apply to multi-family properties",
+        "No impact fees for ADUs under 750 sq ft",
+        "No parking required within 1/2 mile of transit",
+      ];
+    } else {
+      result.tips = ["No impact fees for ADUs under 750 sq ft", "4-foot setbacks for detached ADUs", "No parking required within 1/2 mile of transit", "Maximum 1,200 sq ft for detached ADU"];
+    }
+
+    if (aduEligibility?.warnings) {
+      result.tips.push(...aduEligibility.warnings);
+    }
   } else if (desc.includes("solar") || desc.includes("photovoltaic") || desc.includes("pv")) {
     result.permits_needed.push({ type: "photovoltaic_solar", name: "Solar/PV Permit", reason: "Required for solar panel installation" });
     result.estimated_timeline = "1-3 weeks";
@@ -286,7 +407,6 @@ function getFallbackNavigation(input: NavigatePermitsInput): string {
     result.process_steps = ["Submit application with plans (DS-345, DS-560)", "Plan review", "Corrections if needed", "Permit issuance", "Construction with inspections", "Final inspection"];
   }
 
-  // Add answers context if provided
   if (input.answers && Object.keys(input.answers).length > 0) {
     result.note = "Roadmap generated with your additional details. For AI-powered analysis, set ANTHROPIC_API_KEY.";
   }

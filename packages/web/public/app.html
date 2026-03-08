@@ -436,6 +436,7 @@
     }
     .pc-verdict.amber { background: var(--amber-50); border: 1px solid var(--amber-200); }
     .pc-verdict.green { background: var(--sage-50); border: 1px solid var(--sage-200); }
+    .pc-verdict.red { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
     .pc-why { font-size: 0.875rem; color: var(--stone-500); line-height: 1.7; }
     .pc-why strong { color: var(--stone-900); font-weight: 600; }
@@ -618,6 +619,7 @@
       border-radius: var(--radius-sm); margin-left: 0.5rem;
     }
     .data-badge.live { background: var(--sage-100); color: var(--sage-700); }
+    .data-badge.csv { background: var(--amber-100); color: var(--amber-700); }
     .data-badge.fallback { background: var(--amber-100); color: var(--amber-700); }
 
     /* ============================================================
@@ -1184,20 +1186,31 @@ async function startFlow() {
     renderPermitCheck(navData);
     addMsg("I've checked the requirements. Take a look at the permit check on the right.", 'assistant');
 
+    // Check if ADU was blocked by zoning (red verdict)
+    var isAduBlocked = navData.verdict && navData.verdict.level === 'red';
+
     // After a beat, show property
     setTimeout(function() {
       renderProperty(propData);
       showCanvas('canvas-property');
-      addMsg("I've pulled up your property details. " + (propData.is_coastal ? "<strong>You're in the Coastal Zone</strong> — that adds a coastal development permit." : "No special overlays detected."), 'assistant');
+      addMsg("I've pulled up your property details. " + (propData.is_coastal ? "<strong>You're in the Coastal Zone</strong> — that adds a coastal development permit." : propData.zone_code ? "Zone: <strong>" + escHtml(propData.zone_code) + "</strong> (" + escHtml(propData.zone_plain_english || propData.property_type || '') + ")." : "No special overlays detected."), 'assistant');
       state.step = 2;
 
-      // If we have a category, show options
-      setTimeout(function() {
-        renderOptions();
-        showCanvas('canvas-options');
-        addMsg("Here are the options for your project type. Click one to explore costs and timeline.", 'assistant');
-        state.step = 3;
-      }, 1500);
+      // Only show options if the project wasn't blocked by zoning
+      if (!isAduBlocked) {
+        setTimeout(function() {
+          renderOptions();
+          showCanvas('canvas-options');
+          addMsg("Here are the options for your project type. Click one to explore costs and timeline.", 'assistant');
+          state.step = 3;
+        }, 1500);
+      } else {
+        // Keep the permit check (red verdict) visible
+        setTimeout(function() {
+          showCanvas('canvas-permit');
+          addMsg("Based on the zoning for this address, this project type is <strong>not permitted</strong>. See the details on the right.", 'assistant');
+        }, 800);
+      }
     }, 1500);
 
   } catch (err) {
@@ -1238,7 +1251,7 @@ function renderPermitCheck(data) {
   document.getElementById('pcSub').textContent = '';
 
   var verdictDiv = document.getElementById('pcVerdict');
-  verdictDiv.className = 'pc-verdict ' + (level === 'green' ? 'green' : 'amber');
+  verdictDiv.className = 'pc-verdict ' + (level === 'green' ? 'green' : level === 'red' ? 'red' : 'amber');
   verdictDiv.innerHTML = '<strong>' + escHtml(verdict.reason || 'Based on your project description, here\'s what we found.') + '</strong>';
 
   var whyDiv = document.getElementById('pcWhy');
@@ -1298,7 +1311,9 @@ function renderProperty(data) {
   if (data.data_sources && data.data_sources.length) {
     var srcBadge = document.createElement('div');
     srcBadge.style.cssText = 'margin-top:1rem;font-size:0.75rem;color:var(--stone-500)';
-    srcBadge.innerHTML = '<span class="data-badge live">Live data</span> ' + data.data_sources.join(', ');
+    var hasCSV = data.data_sources.some(function(s) { return s.toLowerCase().indexOf('csv') !== -1; });
+    var allLive = !hasCSV;
+    srcBadge.innerHTML = '<span class="data-badge ' + (allLive ? 'live' : 'csv') + '">' + (allLive ? 'Live data' : 'Cached data') + '</span> ' + data.data_sources.join(', ');
     document.getElementById('propertyCard').appendChild(srcBadge);
   }
 }

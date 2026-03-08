@@ -36,7 +36,7 @@ PermitPal SD provides two access points to demystify the permit process:
 | [SD City Open Data Portal](https://seshat.datasd.org) | CSV bulk download | 256K+ | No auth |
 | [SD County Socrata API](https://data.sandiegocounty.gov/resource/dyzh-7eat.json) | Live REST API | 236K+ | No auth |
 | [SD ArcGIS Services](https://webmaps.sandiego.gov/arcgis/rest/services/DSD) | Zoning/parcel GIS | Real-time | No auth |
-| [Accela Civic Platform](https://developer.accela.com) | City permit system | Real-time | App ID |
+| [Accela Civic Platform](https://developer.accela.com) | City permit system | Real-time | OAuth2 (CivicID) |
 | San Diego Municipal Code | Curated sections | 10 key sections | Local JSON |
 | SD Development Services | Curated knowledge | 13 permit types, 11 FAQs | Local JSON |
 
@@ -122,12 +122,27 @@ claude mcp add permitpal -- node /path/to/permitpal-sd/packages/mcp-server/dist/
 
 ### Environment Variables
 
+Create a `.env` file in the project root (shared by both MCP server and web app):
+
 ```bash
-# Optional: Enable AI-powered navigation (recommended)
-ANTHROPIC_API_KEY=your-api-key
+# Required: AI-powered navigation
+ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# Optional: Accela API for live City permit data
+# Without these, permit search falls back to CSV bulk data (256K+ records)
+ACCELA_APP_ID=your-app-id            # From developer.accela.com > My Apps
+ACCELA_APP_SECRET=your-app-secret    # From developer.accela.com > My Apps
+ACCELA_USERNAME=your-civic-id-email  # CivicID account (register at user.accela.com)
+ACCELA_PASSWORD=your-civic-id-pass   # CivicID password
 ```
 
-Without an API key, the navigator uses rule-based fallback logic with Q&A support for common project types (ADUs, solar, remodels, water heaters, fences, garage conversions).
+The web app reads this via a symlink (`packages/web/.env.local` → `../../.env`). The MCP server loads it via dotenv.
+
+**Accela setup:** Register a Citizen app at [developer.accela.com](https://developer.accela.com), then create a CivicID at [user.accela.com](https://user.accela.com/register/register). The API uses OAuth2 password grant to get access tokens (auto-refreshed every 15min).
+
+> **Note:** Accela OAuth authentication is implemented and tokens are acquired successfully, but the SANDIEGO agency's API endpoints currently return 500 errors. The server automatically falls back to CSV data. Once Accela's SANDIEGO endpoints are operational, live data will work without code changes.
+
+**Without Accela credentials:** City permit search uses CSV fallback (static Open Data snapshot). County permits (Socrata), zoning (ArcGIS), and AI navigation still work fully. Without ANTHROPIC_API_KEY, the navigator uses rule-based fallback logic for common project types.
 
 ## Key Enhancements (v2)
 

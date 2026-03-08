@@ -66,6 +66,7 @@ function zoneToPlainEnglish(zoneCode: string): string {
   if (z.startsWith("CO")) return "Office Commercial";
   if (z.startsWith("IP")) return "Industrial Park";
   if (z.startsWith("IL")) return "Limited Industrial";
+  if (z.startsWith("CCPD")) return "Commercial Community Plan";
   return zoneCode;
 }
 
@@ -77,7 +78,7 @@ async function geocodeAddress(
   try {
     const query = address.toLowerCase().includes("san diego") ? address : `${address}, San Diego, CA`;
     const url = `${ARCGIS_GEOCODER}?SingleLine=${encodeURIComponent(query)}&outSR=4326&forStorage=false&maxLocations=1&outFields=StAddr,City,RegionAbbr&f=json`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
     const candidate = data.candidates?.[0];
@@ -103,11 +104,19 @@ async function arcgisPointQuery(
   try {
     const geometry = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
     const url = `${serviceUrl}/query?geometry=${geometry}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${encodeURIComponent(outFields)}&returnGeometry=false&f=json`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
-    if (!res.ok) return null;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      console.error(`ArcGIS query failed (${res.status}): ${serviceUrl}`);
+      return null;
+    }
     const data = await res.json();
-    return (data.features?.[0]?.attributes as Record<string, unknown>) ?? null;
-  } catch {
+    const attrs = (data.features?.[0]?.attributes as Record<string, unknown>) ?? null;
+    if (attrs) {
+      console.log(`ArcGIS hit: ${serviceUrl} →`, JSON.stringify(attrs));
+    }
+    return attrs;
+  } catch (e) {
+    console.error(`ArcGIS error: ${serviceUrl}`, e);
     return null;
   }
 }
@@ -169,33 +178,32 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   const [parcel, zoning, coastal, historic, pastPermits] = await Promise.allSettled([
     firstHit(
       [
-        `${SD_WEBMAPS}/Webmaps/SD_WM_BoundaryParcels/MapServer/0`,
+        `${SD_WEBMAPS}/DSD/Basemap/MapServer/15`,
         `${SD_WEBMAPS}/Public/Parcel/MapServer/0`,
         `${SD_WEBMAPS}/Basemaps/SD_Parcels/MapServer/0`,
       ],
-      "APN,LOT_SQFT,SHAPE_Area,YEAR_BUILT,YR_BUILT,ZONING,ZONE_CODE,ZONE_NAME"
+      "*"
     ),
     firstHit(
       [
-        `${SD_WEBMAPS}/Webmaps/SD_WM_ZoningInfo/MapServer/0`,
+        `${SD_WEBMAPS}/DSD/Zoning_Base/MapServer/0`,
         `${SD_WEBMAPS}/Public/Zoning/MapServer/0`,
         `${SD_WEBMAPS}/Zoning/Zoning/MapServer/0`,
       ],
-      "ZONE_NAME,ZONE_CODE,OVERLAYS,IS_HISTORIC,HISTORIC,IS_COASTAL,COASTAL,OVERLAY_ZONES"
+      "*"
     ),
     firstHit(
       [
-        `${SD_WEBMAPS}/Webmaps/SD_WM_CoastalZone/MapServer/0`,
+        `${SD_WEBMAPS}/DSD/Zoning_Overlay/MapServer/2`,
         `${SD_WEBMAPS}/Public/CoastalZone/MapServer/0`,
       ],
-      "OBJECTID"
+      "*"
     ),
     firstHit(
       [
-        `${SD_WEBMAPS}/Webmaps/SD_WM_HistoricDistricts/MapServer/0`,
         `${SD_WEBMAPS}/Public/HistoricDistricts/MapServer/0`,
       ],
-      "OBJECTID,DISTRICT_NAME"
+      "*"
     ),
     fetchPastPermits(streetPart),
   ]);
@@ -203,9 +211,11 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   // 2. Apply parcel data
   if (parcel.status === "fulfilled" && parcel.value) {
     const p = parcel.value;
-    result.apn = String(p.APN ?? p.apn ?? "").trim() || undefined;
-    const lotSqft = Number(p.LOT_SQFT ?? p.SHAPE_Area ?? 0);
+    result.apn = String(p.APNID ?? p.APN ?? p.apn ?? "").trim() || undefined;
+    const lotSqft = Number(p.LOT_SQFT ?? p.Shape_Area ?? p.SHAPE_Area ?? 0);
     if (lotSqft > 0) result.lot_size_sqft = Math.round(lotSqft);
+    const acreage = Number(p.ACREAGE ?? 0);
+    if (acreage > 0 && !result.lot_size_sqft) result.lot_size_sqft = Math.round(acreage * 43560);
     const yearBuilt = Number(p.YEAR_BUILT ?? p.YR_BUILT ?? 0);
     if (yearBuilt > 1800) result.year_built = yearBuilt;
     const rawZone = String(p.ZONING ?? p.ZONE_CODE ?? p.ZONE_NAME ?? "").trim();

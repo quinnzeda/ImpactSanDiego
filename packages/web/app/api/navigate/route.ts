@@ -7,6 +7,50 @@ type Situation = "planning" | "applying" | "waiting";
 type Category = "adu" | "kitchen-bath" | "room-addition" | "solar" | "deck-fence";
 type CanvasType = "verdict" | "checklist" | "status" | "options" | "roadmap";
 
+function isAduProject(description: string): boolean {
+  const desc = description.toLowerCase();
+  return desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny") || desc.includes("in-law");
+}
+
+function isAduIneligibleZone(property: PropertyLookupData | null): boolean {
+  return property?.property_type === "commercial" || property?.property_type === "industrial";
+}
+
+function buildAduIneligibleResponse(property: PropertyLookupData) {
+  const zoneLabel = property.zone_code
+    ? `${property.zone_code} (${property.zone_plain_english ?? property.property_type})`
+    : property.property_type ?? "this zone";
+
+  return {
+    permits_needed: [],
+    exemptions: [],
+    forms_required: [],
+    process_steps: [],
+    estimated_timeline: "N/A",
+    estimated_cost_range: "N/A",
+    tips: [
+      "If this is a mixed-use zone, residential units may be possible through a different permit pathway — consult DSD.",
+      "Contact the Development Services Department at (619) 446-5000 for site-specific guidance.",
+      "Visit https://www.sandiego.gov/development-services for more information.",
+    ],
+    canvas: "verdict" as CanvasType,
+    verdict: {
+      level: "red",
+      headline: `ADUs are not permitted in ${zoneLabel}.`,
+      reason: `This property is zoned ${zoneLabel}, which is a ${property.property_type} zone. Traditional Accessory Dwelling Units (ADUs) are only permitted on residential properties (single-family and multi-family zones) under San Diego Municipal Code §141.0302 and California Government Code §65852.2.`,
+      what_changes_everything: "A zone change or community plan amendment could potentially enable residential use, but this requires a separate discretionary process. Consult DSD for options.",
+    },
+    property: mergePropertyData(undefined, property),
+    reliability: {
+      source: "live",
+      notes: [
+        `Zoning verified via City of San Diego ArcGIS: ${property.zone_code}`,
+        ...property.data_sources.map((s) => `Property data from: ${s}`),
+      ],
+    },
+  };
+}
+
 function selectCanvas(
   situation?: Situation,
   category?: Category,
@@ -51,6 +95,11 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("Property lookup error:", e);
     }
+  }
+
+  // Short-circuit: ADU in commercial/industrial zone → not eligible
+  if (isAduProject(project_description) && isAduIneligibleZone(propertyData)) {
+    return NextResponse.json(buildAduIneligibleResponse(propertyData!));
   }
 
   // Phase 1: Return clarifying questions
@@ -312,6 +361,13 @@ function getFallbackNavigation(
   };
 
   if (desc.includes("adu") || desc.includes("accessory dwelling") || desc.includes("granny")) {
+    // Safety net: ineligible zones should have been caught by early return, but handle here too
+    if (isAduIneligibleZone(property ?? null)) {
+      return buildAduIneligibleResponse(property!);
+    }
+
+    const isMultiFamily = property?.property_type === "multi-family";
+
     (result.permits_needed as Array<{ type: string; name: string; reason: string }>).push(
       { type: "adu_permit", name: "ADU Permit", reason: "Required for ADU construction" }
     );
@@ -329,12 +385,24 @@ function getFallbackNavigation(
       "Construction with inspections",
       "Final inspection + certificate of occupancy",
     ];
-    result.tips = [
-      "No impact fees under 750 sq ft",
-      "4-foot setbacks for detached",
-      "No parking required near transit",
-      "Max 1,200 sq ft detached",
-    ];
+
+    if (isMultiFamily) {
+      result.tips = [
+        "Multi-family ADUs: convert non-livable space (storage, laundry, etc.) or build detached",
+        "At least one 800 sq ft detached ADU is always allowed",
+        "Additional detached ADUs up to 25% of existing unit count",
+        "JADUs do not apply to multi-family properties",
+        "No impact fees under 750 sq ft",
+        "No parking required near transit",
+      ];
+    } else {
+      result.tips = [
+        "No impact fees under 750 sq ft",
+        "4-foot setbacks for detached",
+        "No parking required near transit",
+        "Max 1,200 sq ft detached",
+      ];
+    }
 
     if (answers?.q_adu_type === "Garage conversion") {
       result.tips = [
@@ -351,14 +419,25 @@ function getFallbackNavigation(
     }
 
     if (canvas === "verdict") {
-      result.verdict = {
-        level: "green",
-        headline: "ADUs are generally allowed on single-family lots in San Diego.",
-        reason:
-          "California law (AB 68, SB 9) and San Diego's ADU ordinance permit detached ADUs up to 1,200 sq ft on most residential lots. The city must approve within 60 days.",
-        what_changes_everything:
-          "Coastal overlay, hillside designation, or historic district could add requirements. Address-specific zoning verification is recommended.",
-      };
+      if (isMultiFamily) {
+        result.verdict = {
+          level: "green",
+          headline: "ADUs are allowed on multi-family properties with specific rules.",
+          reason:
+            "California law permits ADUs on multi-family lots by converting non-livable space or adding detached units (up to 25% of existing unit count, minimum 1). The city must approve within 60 days.",
+          what_changes_everything:
+            "The number of existing units determines how many new ADUs are allowed. Coastal overlay or historic district could add requirements.",
+        };
+      } else {
+        result.verdict = {
+          level: "green",
+          headline: "ADUs are generally allowed on single-family lots in San Diego.",
+          reason:
+            "California law (AB 68, SB 9) and San Diego's ADU ordinance permit detached ADUs up to 1,200 sq ft on most residential lots. The city must approve within 60 days.",
+          what_changes_everything:
+            "Coastal overlay, hillside designation, or historic district could add requirements. Address-specific zoning verification is recommended.",
+        };
+      }
     } else if (canvas === "checklist") {
       result.checklist = {
         items: [
@@ -373,40 +452,70 @@ function getFallbackNavigation(
         ],
       };
     } else if (canvas === "options") {
-      result.options = {
-        adu_types: [
-          {
-            id: "detached",
-            label: "Detached ADU",
-            description: "Standalone structure separate from the main house",
-            pros: ["Most privacy for tenant", "Design flexibility", "Higher rental income potential"],
-            cons: ["Requires separate utility connections", "Largest site footprint"],
-          },
-          {
-            id: "attached",
-            label: "Attached ADU",
-            description: "Addition connected to the main house",
-            pros: ["Shared walls reduce construction cost", "Less site work required"],
-            cons: ["Less privacy", "May affect main house living space"],
-          },
-          {
-            id: "garage",
-            label: "Garage Conversion",
-            description: "Convert existing attached or detached garage",
-            pros: ["Lowest cost option", "No setback changes needed", "Fastest approval path"],
-            cons: ["Lose garage space", "Limited square footage"],
-          },
-          {
-            id: "jadu",
-            label: "Junior ADU (JADU)",
-            description: "Up to 500 sq ft within existing home footprint",
-            pros: ["Fastest approvals", "No parking required", "No impact fees"],
-            cons: ["Max 500 sq ft", "Owner must occupy primary residence"],
-          },
-        ],
-        default_type: "detached",
-        size_range: { min: 150, max: 1200, default: 600 },
-      };
+      if (isMultiFamily) {
+        result.options = {
+          adu_types: [
+            {
+              id: "conversion",
+              label: "Convert Non-Livable Space",
+              description: "Convert storage, laundry, or boiler rooms into dwelling units",
+              pros: ["Uses existing structure", "No additional footprint", "Often lower cost"],
+              cons: ["Limited to existing non-livable areas", "May displace shared amenities"],
+            },
+            {
+              id: "detached",
+              label: "Detached ADU",
+              description: "New standalone structure on the property",
+              pros: ["Design flexibility", "Privacy for tenants", "At least one always allowed"],
+              cons: ["Requires available lot space", "Higher construction cost"],
+            },
+            {
+              id: "attached",
+              label: "Attached ADU",
+              description: "Addition connected to the existing building",
+              pros: ["Shared walls reduce cost", "Less site work"],
+              cons: ["May affect existing building layout", "Design constraints"],
+            },
+          ],
+          default_type: "conversion",
+          size_range: { min: 150, max: 800, default: 500 },
+        };
+      } else {
+        result.options = {
+          adu_types: [
+            {
+              id: "detached",
+              label: "Detached ADU",
+              description: "Standalone structure separate from the main house",
+              pros: ["Most privacy for tenant", "Design flexibility", "Higher rental income potential"],
+              cons: ["Requires separate utility connections", "Largest site footprint"],
+            },
+            {
+              id: "attached",
+              label: "Attached ADU",
+              description: "Addition connected to the main house",
+              pros: ["Shared walls reduce construction cost", "Less site work required"],
+              cons: ["Less privacy", "May affect main house living space"],
+            },
+            {
+              id: "garage",
+              label: "Garage Conversion",
+              description: "Convert existing attached or detached garage",
+              pros: ["Lowest cost option", "No setback changes needed", "Fastest approval path"],
+              cons: ["Lose garage space", "Limited square footage"],
+            },
+            {
+              id: "jadu",
+              label: "Junior ADU (JADU)",
+              description: "Up to 500 sq ft within existing home footprint",
+              pros: ["Fastest approvals", "No parking required", "No impact fees"],
+              cons: ["Max 500 sq ft", "Owner must occupy primary residence"],
+            },
+          ],
+          default_type: "detached",
+          size_range: { min: 150, max: 1200, default: 600 },
+        };
+      }
     }
   } else if (desc.includes("solar") || desc.includes("photovoltaic")) {
     (result.permits_needed as Array<{ type: string; name: string; reason: string }>).push(

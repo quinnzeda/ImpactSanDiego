@@ -1,17 +1,13 @@
 /**
  * Accela Civic Platform API client for City of San Diego.
  *
- * Uses the official Accela REST API v4 (no-auth endpoints):
+ * Uses the official Accela REST API v4 with OAuth password grant:
  *   - POST /v4/search/records   — search permits by address, type, status, date
  *   - POST /v4/search/addresses — search reference addresses
  *   - POST /v4/search/parcels   — search parcels by APN, owner, address
  *   - GET  /v4/records/{ids}    — get record detail with expand
  *
- * All "no authorization" endpoints still require:
- *   x-accela-appid   — registered Citizen app ID
- *   x-accela-agency  — agency name (SANDIEGO)
- *   x-accela-environment — PROD
- *
+ * Auth: OAuth2 password grant via auth.accela.com → bearer token.
  * Falls back to CSV (permits-loader) when Accela is unavailable.
  */
 
@@ -20,21 +16,95 @@ import { loadPermits, searchPermits, getPermitStats } from "./permits-loader.js"
 // ── Configuration ────────────────────────────────────────
 
 const ACCELA_BASE = "https://apis.accela.com/v4";
-const ACCELA_APP_ID = process.env.ACCELA_APP_ID || "";
-const ACCELA_APP_SECRET = process.env.ACCELA_APP_SECRET || "";
-const ACCELA_AGENCY = process.env.ACCELA_AGENCY || "SANDIEGO";
-const ACCELA_ENV = process.env.ACCELA_ENVIRONMENT || "PROD";
+const ACCELA_AUTH_URL = "https://auth.accela.com/oauth2/token";
+const getAccelaConfig = () => ({
+  appId: process.env.ACCELA_APP_ID || "",
+  appSecret: process.env.ACCELA_APP_SECRET || "",
+  username: process.env.ACCELA_USERNAME || "",
+  password: process.env.ACCELA_PASSWORD || "",
+  agency: process.env.ACCELA_AGENCY || "SANDIEGO",
+  env: process.env.ACCELA_ENVIRONMENT || "PROD",
+});
 
-function getHeaders(accessToken?: string): Record<string, string> {
+// ── Token Management ─────────────────────────────────────
+
+let _cachedToken: string | null = null;
+let _tokenExpiry = 0;
+let _refreshToken: string | null = null;
+
+async function getAccessToken(): Promise<string | null> {
+  // Return cached token if still valid (with 60s buffer)
+  if (_cachedToken && Date.now() < _tokenExpiry - 60_000) {
+    return _cachedToken;
+  }
+
+  const config = getAccelaConfig();
+  if (!config.appId || !config.username || !config.password) {
+    return null;
+  }
+
+  // Try refresh token first
+  if (_refreshToken) {
+    try {
+      const token = await requestToken({
+        grant_type: "refresh_token",
+        client_id: config.appId,
+        client_secret: config.appSecret,
+        refresh_token: _refreshToken,
+      });
+      if (token) return token;
+    } catch {
+      // Refresh failed, fall through to password grant
+    }
+  }
+
+  // Password grant
+  return requestToken({
+    grant_type: "password",
+    client_id: config.appId,
+    client_secret: config.appSecret,
+    username: config.username,
+    password: config.password,
+    scope: "get_records search_records search_addresses search_parcels",
+    agency_name: config.agency,
+    environment: config.env,
+  });
+}
+
+async function requestToken(params: Record<string, string>): Promise<string | null> {
+  const body = new URLSearchParams(params).toString();
+  const res = await fetch(ACCELA_AUTH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error(`Accela auth error: ${res.status} — ${err.error_description || err.error || "unknown"}`);
+    return null;
+  }
+
+  const data = await res.json();
+  _cachedToken = data.access_token;
+  _tokenExpiry = Date.now() + (data.expires_in || 900) * 1000;
+  _refreshToken = data.refresh_token || _refreshToken;
+  console.error(`Accela: Token acquired (expires in ${data.expires_in}s)`);
+  return _cachedToken;
+}
+
+async function getHeaders(): Promise<Record<string, string>> {
+  const config = getAccelaConfig();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
-    "x-accela-appid": ACCELA_APP_ID,
-    "x-accela-agency": ACCELA_AGENCY,
-    "x-accela-environment": ACCELA_ENV,
+    "x-accela-appid": config.appId,
+    "x-accela-agency": config.agency,
+    "x-accela-environment": config.env,
   };
-  if (accessToken) {
-    headers["Authorization"] = accessToken;
+  const token = await getAccessToken();
+  if (token) {
+    headers["Authorization"] = token;
   }
   return headers;
 }
@@ -240,7 +310,8 @@ function mapStatusToAccela(status: string): string[] | undefined {
 let _accelaAvailable: boolean | null = null;
 
 export function isAccelaConfigured(): boolean {
-  return ACCELA_APP_ID.length > 0;
+  const config = getAccelaConfig();
+  return config.appId.length > 0 && config.username.length > 0 && config.password.length > 0;
 }
 
 export async function validateAccelaConnection(): Promise<boolean> {
@@ -255,13 +326,13 @@ export async function validateAccelaConnection(): Promise<boolean> {
       `${ACCELA_BASE}/search/addresses?limit=1`,
       {
         method: "POST",
-        headers: getHeaders(),
+        headers: await getHeaders(),
         body: JSON.stringify({ city: "San Diego" }),
       }
     );
 
     if (res.ok) {
-      console.error(`Accela API: Connection verified (agency: ${ACCELA_AGENCY}, env: ${ACCELA_ENV})`);
+      console.error(`Accela API: Connection verified (agency: ${getAccelaConfig().agency}, env: ${getAccelaConfig().env})`);
       _accelaAvailable = true;
       return true;
     }
@@ -317,7 +388,7 @@ export async function accelaSearchAddresses(params: {
     const url = `${ACCELA_BASE}/search/addresses?limit=${limit}&offset=${offset}`;
     const res = await throttledFetch(url, {
       method: "POST",
-      headers: getHeaders(),
+      headers: await getHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -378,7 +449,7 @@ export async function accelaSearchParcels(params: {
     const url = `${ACCELA_BASE}/search/parcels?limit=${limit}&offset=${offset}&expand=${expandStr}`;
     const res = await throttledFetch(url, {
       method: "POST",
-      headers: getHeaders(),
+      headers: await getHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -474,7 +545,7 @@ export async function accelaSearchRecords(params: {
     const url = `${ACCELA_BASE}/search/records?limit=${limit}&offset=${offset}&expand=${expandStr}`;
     const res = await throttledFetch(url, {
       method: "POST",
-      headers: getHeaders(),
+      headers: await getHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -510,7 +581,7 @@ export async function accelaGetRecord(
     const url = `${ACCELA_BASE}/records/${encodeURIComponent(recordId)}?expand=${expandStr}`;
     const res = await throttledFetch(url, {
       method: "GET",
-      headers: getHeaders(),
+      headers: await getHeaders(),
     });
 
     if (!res.ok) {
