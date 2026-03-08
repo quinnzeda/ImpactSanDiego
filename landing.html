@@ -128,7 +128,7 @@
       flex-direction: column;
       align-items: center;
       padding-inline: clamp(1.25rem, 5vw, 3rem);
-      padding-block: 2.5rem clamp(3rem, 8vh, 5rem);
+      padding-block: 1.5rem 2rem;
     }
 
     .hero-content {
@@ -136,14 +136,14 @@
       max-width: 700px;
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 1.75rem;
     }
 
     /* ---- Heading block ---- */
     .heading-block {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 1rem;
     }
 
     .eyebrow {
@@ -171,7 +171,7 @@
     .subheadline {
       font-size: clamp(0.9375rem, 1.4vw, 1rem);
       font-weight: 400;
-      line-height: 1.65;
+      line-height: 1.7;
       color: var(--stone-600);
     }
 
@@ -188,13 +188,14 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 0.625rem;
+      margin-top: -1.125rem; /* pulls cards tight to the label above */
     }
 
     .situation-card {
       display: flex;
       flex-direction: column;
-      gap: 0.625rem;
-      padding: 1.125rem 1rem;
+      gap: 0.375rem;
+      padding: 0.75rem 1rem;
       background: white;
       border: 1.5px solid var(--stone-200);
       border-radius: var(--radius-lg);
@@ -244,10 +245,10 @@
     }
 
     .situation-sub {
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
       font-weight: 400;
       color: var(--stone-500);
-      line-height: 1.5;
+      line-height: 1.4;
     }
 
     /* ---- Project chips (Level 2) ---- */
@@ -311,15 +312,17 @@
     .suggestions-label {
       font-size: 0.75rem;
       font-weight: 500;
-      color: var(--stone-400);
+      color: var(--stone-500);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       margin-bottom: 0.5rem;
       padding-top: 0.75rem;
       display: block;
     }
 
     .examples-list {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 0.5rem;
       padding-bottom: 0.25rem;
     }
@@ -361,7 +364,7 @@
     .input-area {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.75rem;
       background: white;
       border: 1.5px solid var(--stone-200);
       border-radius: var(--radius-lg);
@@ -415,7 +418,7 @@
 
     .prompt-input {
       width: 100%;
-      min-height: 80px;
+      min-height: 64px;
       max-height: 180px;
       resize: none;
       font-size: 0.9375rem;
@@ -425,7 +428,7 @@
       border: 1.5px solid var(--stone-200);
       border-radius: var(--radius-md);
       padding: 0.625rem 0.875rem;
-      padding-bottom: 3rem;
+      padding-bottom: 0.625rem;
       outline: none;
       line-height: 1.55;
       overflow-y: auto;
@@ -436,38 +439,39 @@
     .prompt-input:focus { border-color: var(--sage-300); }
 
     .input-actions {
-      position: absolute;
-      right: 0.875rem;
-      bottom: 0.625rem;
-      left: 0.875rem;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: -0.375rem;
+      padding-top: 0.25rem;
     }
 
     .input-hint {
       font-size: 0.75rem;
       color: var(--stone-300);
+      text-align: center;
     }
 
     .submit-btn {
       display: flex;
       align-items: center;
-      gap: 0.375rem;
-      font-size: 0.875rem;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      font-size: 1.0625rem;
       font-weight: 600;
       color: white;
       background: var(--sage-500);
       border: none;
-      border-radius: var(--radius-sm);
-      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.5rem;
       transition: background 0.16s ease-out, transform 0.14s ease-out;
-      white-space: nowrap;
+      letter-spacing: -0.01em;
     }
 
     .submit-btn:hover  { background: var(--sage-600); transform: translateY(-1px); }
     .submit-btn:active { transform: translateY(0); }
-    .submit-btn svg    { width: 14px; height: 14px; }
+    .submit-btn svg    { width: 16px; height: 16px; }
 
     /* ============================================================
        ANIMATIONS
@@ -685,11 +689,8 @@
 
       <!-- Heading -->
       <div class="heading-block">
-        <p class="eyebrow">For San Diego homeowners &amp; contractors</p>
-        <h1 class="headline">Know what you can build — <em>before you break ground.</em></h1>
-        <p class="subheadline">
-          We pull live data from the City of San Diego and show you what's allowed on your lot, what to submit for a permit, and where your application stands — in plain English.
-        </p>
+        <h1 class="headline">San Diego permit guidance for residential projects.</h1>
+        <p class="subheadline">Know what is allowed on your lot, what documents you need, and how your application is moving — in plain English, before delays cost you time and money.</p>
       </div>
 
       <!-- Level 1: Situation cards -->
@@ -698,17 +699,17 @@
 
         <button class="situation-card" data-situation="planning" type="button">
           <span class="situation-label">Just starting to think about it</span>
-          <span class="situation-sub">I want to know what's allowed and what it might cost</span>
+          <span class="situation-sub">What's allowed, what it costs</span>
         </button>
 
         <button class="situation-card" data-situation="applying" type="button">
           <span class="situation-label">Ready to apply for a permit</span>
-          <span class="situation-sub">I know what I'm building and want the checklist</span>
+          <span class="situation-sub">Get the exact checklist</span>
         </button>
 
         <button class="situation-card" data-situation="waiting" type="button">
           <span class="situation-label">Waiting on a permit I filed</span>
-          <span class="situation-sub">Track status or figure out what a notice means</span>
+          <span class="situation-sub">Track status or decode a notice</span>
         </button>
 
       </div>
@@ -753,16 +754,6 @@
               placeholder="Type your question, or pick one below..."
               rows="2"
             ></textarea>
-            <div class="input-actions">
-              <span class="input-hint">Cmd + Return to submit</span>
-              <button class="submit-btn" id="submitBtn" type="button">
-                <span id="submitLabel">Get started</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12 5 19 12 12 19"/>
-                </svg>
-              </button>
-            </div>
           </div>
 
           <!-- Suggestions: appear after selecting situation + project type -->
@@ -775,6 +766,17 @@
 
         </div>
 
+      </div>
+
+      <div class="input-actions">
+        <span class="input-hint">Cmd + Return to submit</span>
+        <button class="submit-btn" id="submitBtn" type="button">
+          <span id="submitLabel">Check what's allowed</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
       </div>
 
     </div>
@@ -910,9 +912,9 @@
   };
 
   var SUBMIT_LABELS = {
-    planning: "Find out what's allowed",
-    applying: 'Get my permit checklist',
-    waiting:  'Check my permit'
+    planning: "Check what's allowed",
+    applying: 'Build my permit checklist',
+    waiting:  'Track my permit status'
   };
 
   var ADDRESS_LABELS = {
@@ -1097,7 +1099,7 @@
   }
 
   function resetSubmitLabel() {
-    document.getElementById('submitLabel').textContent = 'Get started';
+    document.getElementById('submitLabel').textContent = "Check what's allowed";
   }
 
   function updateFieldLabels(situation) {

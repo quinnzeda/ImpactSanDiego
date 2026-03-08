@@ -53,21 +53,21 @@ export function PermitRoadmap({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white border border-border rounded-xl p-6">
-        <h2 className="text-xl font-bold mb-1">Your Permit Roadmap</h2>
+      <div className="bg-white border border-stone-200 rounded-[14px] p-6">
+        <h2 className="font-serif text-xl font-semibold mb-1 text-stone-900">Your Permit Roadmap</h2>
         <p className="text-sm text-muted mb-6">
           For: &ldquo;{projectDescription}&rdquo;
         </p>
 
         {/* Timeline */}
         {roadmap.estimated_timeline && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-            <svg className="w-5 h-5 text-primary mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="bg-sage-50 border border-sage-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <svg className="w-5 h-5 text-sage-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <p className="font-medium text-primary-dark">Estimated Timeline</p>
-              <p className="text-sm text-primary">{roadmap.estimated_timeline}</p>
+              <p className="font-medium text-stone-900">Estimated Timeline</p>
+              <p className="text-sm text-sage-700">{roadmap.estimated_timeline}</p>
             </div>
           </div>
         )}

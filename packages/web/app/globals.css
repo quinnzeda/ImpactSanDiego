@@ -1,72 +1,129 @@
 @import "tailwindcss";
 
+/* ============================================================
+   DESIGN TOKENS — Permit Buddy
+============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #1e40af;
-  --primary-light: #3b82f6;
-  --primary-dark: #1e3a8a;
-  --accent: #059669;
-  --accent-light: #10b981;
-  --surface: #f8fafc;
-  --surface-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --muted: #64748b;
+  /* Stone palette */
+  --stone-50:  oklch(97.5% 0.005 75);
+  --stone-100: oklch(93.5% 0.009 75);
+  --stone-200: oklch(88%   0.012 75);
+  --stone-300: oklch(80%   0.014 75);
+  --stone-500: oklch(62%   0.016 75);
+  --stone-600: oklch(50%   0.014 75);
+  --stone-700: oklch(37%   0.012 75);
+  --stone-900: oklch(22%   0.008 240);
+
+  /* Sage palette */
+  --sage-50:  oklch(97%   0.016 158);
+  --sage-100: oklch(92%   0.034 158);
+  --sage-200: oklch(84%   0.060 158);
+  --sage-300: oklch(74%   0.082 158);
+  --sage-500: oklch(58%   0.105 158);
+  --sage-600: oklch(50%   0.098 158);
+  --sage-700: oklch(42%   0.088 158);
+
+  /* Amber */
+  --amber-100: oklch(94%  0.042 72);
+  --amber-500: oklch(74%  0.128 62);
+  --amber-700: oklch(56%  0.118 52);
+
+  /* Semantic tokens */
+  --background:    var(--stone-50);
+  --foreground:    var(--stone-900);
+  --primary:       var(--sage-500);
+  --primary-light: var(--sage-300);
+  --primary-dark:  var(--sage-700);
+  --accent:        var(--sage-600);
+  --accent-light:  var(--sage-300);
+  --surface:       var(--stone-100);
+  --surface-hover: oklch(90% 0.012 75);
+  --border:        var(--stone-200);
+  --muted:         var(--stone-500);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
+  /* Semantic Tailwind utilities */
+  --color-background:    var(--background);
+  --color-foreground:    var(--foreground);
+  --color-primary:       var(--primary);
   --color-primary-light: var(--primary-light);
-  --color-primary-dark: var(--primary-dark);
-  --color-accent: var(--accent);
-  --color-accent-light: var(--accent-light);
-  --color-surface: var(--surface);
+  --color-primary-dark:  var(--primary-dark);
+  --color-accent:        var(--accent);
+  --color-accent-light:  var(--accent-light);
+  --color-surface:       var(--surface);
   --color-surface-hover: var(--surface-hover);
-  --color-border: var(--border);
-  --color-muted: var(--muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-border:        var(--border);
+  --color-muted:         var(--muted);
+
+  /* Raw palette */
+  --color-stone-50:  var(--stone-50);
+  --color-stone-100: var(--stone-100);
+  --color-stone-200: var(--stone-200);
+  --color-stone-300: var(--stone-300);
+  --color-stone-500: var(--stone-500);
+  --color-stone-600: var(--stone-600);
+  --color-stone-700: var(--stone-700);
+  --color-stone-900: var(--stone-900);
+
+  --color-sage-50:  var(--sage-50);
+  --color-sage-100: var(--sage-100);
+  --color-sage-200: var(--sage-200);
+  --color-sage-300: var(--sage-300);
+  --color-sage-500: var(--sage-500);
+  --color-sage-600: var(--sage-600);
+  --color-sage-700: var(--sage-700);
+
+  --color-amber-100: var(--amber-100);
+  --color-amber-500: var(--amber-500);
+  --color-amber-700: var(--amber-700);
+
+  /* Fonts */
+  --font-sans:  var(--font-dmsans), system-ui, sans-serif;
+  --font-serif: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-mono:  var(--font-geist-mono);
+}
+
+/* ============================================================
+   BASE
+============================================================ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background: var(--stone-50);
+  color: var(--stone-900);
 }
 
+/* ============================================================
+   ANIMATIONS
+============================================================ */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out;
-}
+.animate-fade-in { animation: fade-in 0.22s ease-out both; }
 
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.animate-slide-up { animation: slide-up 0.3s ease-out both; }
 
-.animate-slide-up {
-  animation: slide-up 0.5s ease-out;
-}
-
+/* Loading dots */
 @keyframes pulse-dot {
   0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
+  40%           { transform: scale(1); }
 }
-
 .loading-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--primary);
+  background: var(--sage-500);
   animation: pulse-dot 1.4s infinite ease-in-out both;
 }
-
 .loading-dot:nth-child(1) { animation-delay: -0.32s; }
 .loading-dot:nth-child(2) { animation-delay: -0.16s; }
