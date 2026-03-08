@@ -305,6 +305,12 @@ generateChecklist(propertyData: object, projectDescription: string, projectType:
 lookupPermitStatus(permitNumber: string)
   → calls Accela, returns status + workflow tasks
   → Claude translates status to plain English
+
+getBuildingPlansGuide(address: string, projectType: string, isOwner: boolean)
+  → determines if existing floor plans are needed for the project type
+  → auto-enriches with property zoning (ArcGIS) + permit history (Accela/Socrata)
+  → returns personalized step-by-step guide for obtaining plans
+  → covers City (DSD Plan Duplication) and County (PDS/PRA) processes
 ```
 
 ### System Prompt Key Sections
