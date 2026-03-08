@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { PermitRoadmap } from "./components/PermitRoadmap";
-import { QuestionsForm } from "./components/QuestionsForm";
 import { PermitVerdictCard } from "./components/PermitVerdictCard";
 import { PersonalizedChecklist } from "./components/PersonalizedChecklist";
 import { StatusTracker } from "./components/StatusTracker";
@@ -17,13 +16,6 @@ type Category = "adu" | "kitchen-bath" | "room-addition" | "solar" | "deck-fence
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-}
-
-interface QuestionsData {
-  phase: "questions";
-  project_summary: string;
-  questions: Array<{ id: string; question: string; why: string; options?: string[] }>;
-  preliminary_assessment: string;
 }
 
 // ── Static data ───────────────────────────────────────────────────────────────
@@ -72,11 +64,16 @@ const MODE_TAGS: Record<Situation, string> = {
   waiting:  "Permit tracker",
 };
 
-const FIRST_MESSAGES: Record<Situation, string> = {
-  planning: "Got it. Let me pull up what San Diego's zoning rules say for your area.",
-  applying: "Sure, let's get your checklist together. Give me a moment.",
-  waiting:  "I'll look that up. Give me a moment to check the city's system.",
-};
+function getFirstMessage(situation: Situation, addr: string): string {
+  if (addr) {
+    if (situation === "planning") return `Looking up ${addr} in the city's zoning records...`;
+    if (situation === "applying") return `Pulling the permit checklist for ${addr}...`;
+    return `Checking permit status for ${addr}...`;
+  }
+  if (situation === "planning") return "Got it. Let me pull up what San Diego's zoning rules say.";
+  if (situation === "applying") return "Sure, let's get your checklist together. Give me a moment.";
+  return "I'll look that up. Give me a moment to check the city's system.";
+}
 
 const CANVAS_CONTENT: Record<Situation, { title: string; desc: string }> = {
   planning: { title: "Zoning rules for your property",  desc: "What your lot allows, setback requirements, and what permits you'll need will show up here." },
@@ -101,7 +98,6 @@ export default function Home() {
   const [modeTag,    setModeTag]    = useState("");
   const [messages,   setMessages]   = useState<ChatMessage[]>([]);
   const [loading,    setLoading]    = useState(false);
-  const [questions,  setQuestions]  = useState<QuestionsData | null>(null);
   const [result,     setResult]     = useState<Record<string, unknown> | null>(null);
   const [chatInput,  setChatInput]  = useState("");
 
@@ -177,12 +173,11 @@ export default function Home() {
     setModeTag(MODE_TAGS[situation]);
     setMessages([
       { role: "user",      content: userMsg },
-      { role: "assistant", content: FIRST_MESSAGES[situation] },
+      { role: "assistant", content: getFirstMessage(situation, address) },
     ]);
     setAppMode(true);
     setLoading(true);
     setResult(null);
-    setQuestions(null);
 
     try {
       const res = await fetch("/api/navigate", {
@@ -191,7 +186,7 @@ export default function Home() {
         body: JSON.stringify({
           project_description: promptValue || `${situation} permit inquiry`,
           property_address:    address || undefined,
-          include_questions:   situation !== "waiting",
+          include_questions:   false,
           situation,
           category:            activeCategory || undefined,
         }),
@@ -199,66 +194,13 @@ export default function Home() {
 
       if (!res.ok) throw new Error("Failed to get permit guidance");
       const data = await res.json();
-
-      if (data.phase === "questions") {
-        setQuestions(data);
-      } else {
-        setResult(data);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAnswersSubmit(answers: Record<string, string>) {
-    setLoading(true);
-    setQuestions(null);
-    setMessages((prev) => [
-      ...prev,
-      { role: "user",      content: "Here are my answers." },
-      { role: "assistant", content: "Perfect — generating your personalized roadmap now." },
-    ]);
-
-    try {
-      const res = await fetch("/api/navigate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_description: promptValue || "permit inquiry",
-          property_address:    address || undefined,
-          answers,
-          situation:           activeSituation || undefined,
-          category:            activeCategory || undefined,
-        }),
-      });
-      const data = await res.json();
       setResult(data);
     } catch (err) {
       console.error(err);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Something went wrong looking that up. Please try again." }]);
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleSkipQuestions() {
-    setQuestions(null);
-    setLoading(true);
-    fetch("/api/navigate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_description: promptValue || "permit inquiry",
-        property_address:    address || undefined,
-        situation:           activeSituation || undefined,
-        category:            activeCategory || undefined,
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => setResult(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
   }
 
   async function handleChatSend() {
@@ -270,7 +212,6 @@ export default function Home() {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
     setResult(null);
-    setQuestions(null);
 
     try {
       const res = await fetch("/api/navigate", {
@@ -285,11 +226,7 @@ export default function Home() {
       });
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", content: "Got it — here's what I found." }]);
-      if (data.phase === "questions") {
-        setQuestions(data);
-      } else {
-        setResult(data);
-      }
+      setResult(data);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
@@ -302,7 +239,6 @@ export default function Home() {
     setAppMode(false);
     setMessages([]);
     setResult(null);
-    setQuestions(null);
     setLoading(false);
   }
 
@@ -546,7 +482,8 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleChatSend}
-                  className="w-10 h-10 bg-sage-500 border-none rounded-[6px] flex items-center justify-center shrink-0 cursor-pointer hover:bg-sage-600 transition-colors duration-[0.15s]"
+                  disabled={loading}
+                  className="w-10 h-10 bg-sage-500 border-none rounded-[6px] flex items-center justify-center shrink-0 cursor-pointer hover:bg-sage-600 transition-colors duration-[0.15s] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <SendIcon />
                 </button>
@@ -560,16 +497,6 @@ export default function Home() {
                   <CanvasLoading />
                 </div>
               )}
-              {!loading && questions && (
-                <div className="p-6">
-                  <QuestionsForm
-                    data={questions}
-                    onSubmit={handleAnswersSubmit}
-                    onSkip={handleSkipQuestions}
-                    loading={loading}
-                  />
-                </div>
-              )}
               {!loading && result && (
                 <div className="p-6 flex flex-col gap-4">
                   <CanvasRouter
@@ -580,7 +507,7 @@ export default function Home() {
                   />
                 </div>
               )}
-              {!loading && !questions && !result && (
+              {!loading && !result && (
                 <div className="flex-1 flex items-center justify-center p-8">
                   <CanvasEmpty title={canvasContent.title} desc={canvasContent.desc} />
                 </div>
@@ -659,6 +586,7 @@ function CanvasRouter({
         <OptionsExplorer
           options={result.options as Record<string, unknown> | undefined}
           reliability={reliability}
+          property={result.property as Record<string, unknown> | undefined}
         />
       );
       break;

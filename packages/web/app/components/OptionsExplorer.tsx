@@ -24,6 +24,7 @@ interface OptionsData {
 interface Props {
   options?: Record<string, unknown> | OptionsData;
   reliability?: Reliability;
+  property?: Record<string, unknown>;
 }
 
 const RELIABILITY_STYLES = {
@@ -32,15 +33,25 @@ const RELIABILITY_STYLES = {
   fallback: { label: "Fallback", cls: "bg-stone-100 text-stone-600 border-stone-200" },
 };
 
-// Rough fee hint thresholds (San Diego, informational only)
-function getFeeHint(sqft: number): string {
-  if (sqft < 500) return "No impact fees (state exemption for ADUs under 500 sq ft). Permit fees ~$3,000–$6,000.";
-  if (sqft < 750) return "No impact fees (under 750 sq ft threshold). Permit fees ~$4,000–$8,000.";
-  if (sqft < 1000) return "Impact fees may apply (~$20,000–$40,000+). Verify with DSD.";
-  return "Impact fees likely apply (~$40,000–$80,000+). Engineering review required. Verify with DSD.";
+function calcFees(sqft: number, isCoastal: boolean, isHistoric: boolean) {
+  const planCheck = Math.round(2800 + sqft * 2);
+  const buildPermit = Math.round(2600 + sqft * 2);
+  const waterSewer = 4100;
+  const schoolFees = sqft > 500 ? 3100 : 0;
+  const coastalPermit = isCoastal ? 1200 : 0;
+  const historicReview = isHistoric ? 800 : 0;
+  const total = planCheck + buildPermit + waterSewer + schoolFees + coastalPermit + historicReview;
+  const buildLow = Math.round((sqft * 300) / 1000) * 1000;
+  const buildHigh = Math.round((sqft * 400) / 1000) * 1000;
+  const timeline = sqft <= 400 ? "4–6 mo" : sqft <= 700 ? "6–8 mo" : "8–12 mo";
+  return { planCheck, buildPermit, waterSewer, schoolFees, coastalPermit, historicReview, total, buildLow, buildHigh, timeline };
 }
 
-export function OptionsExplorer({ options, reliability }: Props) {
+function fmt(n: number): string {
+  return "$" + n.toLocaleString();
+}
+
+export function OptionsExplorer({ options, reliability, property }: Props) {
   const o = options as OptionsData | undefined;
   const types = o?.adu_types || [];
   const sizeRange = o?.size_range || { min: 150, max: 1200, default: 600 };
@@ -50,6 +61,12 @@ export function OptionsExplorer({ options, reliability }: Props) {
 
   const rel = reliability ? RELIABILITY_STYLES[reliability.source] : null;
   const selectedAdu = types.find((t) => t.id === selectedType) || types[0];
+
+  // Detect coastal/historic from overlays
+  const overlays = (property?.overlays as string[] | undefined) || [];
+  const isCoastal = overlays.some((ov) => /coastal/i.test(ov));
+  const isHistoric = overlays.some((ov) => /historic/i.test(ov));
+  const fees = calcFees(size, isCoastal, isHistoric);
 
   return (
     <div className="bg-white border border-stone-200 rounded-[14px] overflow-hidden">
@@ -155,11 +172,45 @@ export function OptionsExplorer({ options, reliability }: Props) {
               </div>
             </div>
 
-            {/* Fee hint */}
-            <div className="bg-amber-50 border border-amber-200 rounded-[10px] px-4 py-3">
-              <p className="text-[0.75rem] font-semibold text-amber-800 mb-1">Fee estimate for {size.toLocaleString()} sq ft</p>
-              <p className="text-[0.8125rem] text-amber-700 leading-[1.5]">{getFeeHint(size)}</p>
-              <p className="text-[0.6875rem] text-amber-600 mt-1.5">Informational only — verify with DSD.</p>
+            {/* Big numbers */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="bg-stone-50 rounded-[10px] px-3 py-2.5 text-center">
+                <p className="text-[1.1rem] font-bold text-stone-900">~{fmt(Math.round(fees.total / 100) * 100)}</p>
+                <p className="text-[0.6875rem] text-stone-500 uppercase tracking-wide mt-0.5">Permit fees</p>
+              </div>
+              <div className="bg-stone-50 rounded-[10px] px-3 py-2.5 text-center">
+                <p className="text-[1.1rem] font-bold text-stone-900">~${Math.round(fees.buildLow / 1000)}k–${Math.round(fees.buildHigh / 1000)}k</p>
+                <p className="text-[0.6875rem] text-stone-500 uppercase tracking-wide mt-0.5">Construction</p>
+              </div>
+              <div className="bg-stone-50 rounded-[10px] px-3 py-2.5 text-center">
+                <p className="text-[1.1rem] font-bold text-stone-900">{fees.timeline}</p>
+                <p className="text-[0.6875rem] text-stone-500 uppercase tracking-wide mt-0.5">Timeline</p>
+              </div>
+            </div>
+
+            {/* Fee breakdown */}
+            <div className="bg-stone-50 rounded-[10px] px-4 py-3">
+              <p className="text-[0.6875rem] font-semibold text-stone-400 tracking-[0.06em] uppercase mb-2.5">Permit fee breakdown</p>
+              {[
+                ["Plan check",       fmt(fees.planCheck)],
+                ["Building permit",  fmt(fees.buildPermit)],
+                ["Water & sewer",    fmt(fees.waterSewer)],
+                ["School fees",      fees.schoolFees > 0 ? fmt(fees.schoolFees) : "Exempt"],
+                ...(isCoastal  ? [["Coastal permit",  fmt(fees.coastalPermit)]] : []),
+                ...(isHistoric ? [["Historic review", fmt(fees.historicReview)]] : []),
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between py-1.5 border-b border-stone-200 last:border-0 text-[0.8125rem]">
+                  <span className="text-stone-500">{label}</span>
+                  <span className="text-stone-700 font-medium">{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-2.5 text-[0.875rem] font-bold text-stone-900">
+                <span>Estimated total</span>
+                <span>~{fmt(Math.round(fees.total / 100) * 100)}</span>
+              </div>
+              <p className="text-[0.6875rem] text-stone-400 mt-2">
+                Informational only — verify with DSD. {size > 500 && <span className="text-amber-600 font-medium">⚠ Over 500 sq ft adds ~$3,100 in school impact fees.</span>}
+              </p>
             </div>
           </>
         )}

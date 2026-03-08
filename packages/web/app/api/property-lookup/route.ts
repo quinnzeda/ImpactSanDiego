@@ -155,110 +155,115 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   result.lng = geo.lng;
   result.data_sources.push("ArcGIS Geocoder");
 
-  // 2. Parcel data (lot size, APN, year built) — try multiple known SD service paths
-  const parcelServicePaths = [
-    `${SD_WEBMAPS}/Webmaps/SD_WM_BoundaryParcels/MapServer/0`,
-    `${SD_WEBMAPS}/Public/Parcel/MapServer/0`,
-    `${SD_WEBMAPS}/Basemaps/SD_Parcels/MapServer/0`,
-  ];
+  // 2–6. Run all parallel lookups concurrently after geocoding
+  const streetPart = address.split(",")[0].trim();
 
-  for (const path of parcelServicePaths) {
-    const parcel = await arcgisPointQuery(path, geo.lat, geo.lng, "APN,LOT_SQFT,SHAPE_Area,YEAR_BUILT,YR_BUILT,ZONING,ZONE_CODE,ZONE_NAME");
-    if (parcel) {
-      result.apn = String(parcel.APN ?? parcel.apn ?? "").trim() || undefined;
-      const lotSqft = Number(parcel.LOT_SQFT ?? parcel.SHAPE_Area ?? 0);
-      if (lotSqft > 0) result.lot_size_sqft = Math.round(lotSqft);
-      const yearBuilt = Number(parcel.YEAR_BUILT ?? parcel.YR_BUILT ?? 0);
-      if (yearBuilt > 1800) result.year_built = yearBuilt;
-      const rawZone = String(parcel.ZONING ?? parcel.ZONE_CODE ?? parcel.ZONE_NAME ?? "").trim();
+  async function firstHit(paths: string[], fields: string) {
+    for (const path of paths) {
+      const r = await arcgisPointQuery(path, geo!.lat, geo!.lng, fields);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  const [parcel, zoning, coastal, historic, pastPermits] = await Promise.allSettled([
+    firstHit(
+      [
+        `${SD_WEBMAPS}/Webmaps/SD_WM_BoundaryParcels/MapServer/0`,
+        `${SD_WEBMAPS}/Public/Parcel/MapServer/0`,
+        `${SD_WEBMAPS}/Basemaps/SD_Parcels/MapServer/0`,
+      ],
+      "APN,LOT_SQFT,SHAPE_Area,YEAR_BUILT,YR_BUILT,ZONING,ZONE_CODE,ZONE_NAME"
+    ),
+    firstHit(
+      [
+        `${SD_WEBMAPS}/Webmaps/SD_WM_ZoningInfo/MapServer/0`,
+        `${SD_WEBMAPS}/Public/Zoning/MapServer/0`,
+        `${SD_WEBMAPS}/Zoning/Zoning/MapServer/0`,
+      ],
+      "ZONE_NAME,ZONE_CODE,OVERLAYS,IS_HISTORIC,HISTORIC,IS_COASTAL,COASTAL,OVERLAY_ZONES"
+    ),
+    firstHit(
+      [
+        `${SD_WEBMAPS}/Webmaps/SD_WM_CoastalZone/MapServer/0`,
+        `${SD_WEBMAPS}/Public/CoastalZone/MapServer/0`,
+      ],
+      "OBJECTID"
+    ),
+    firstHit(
+      [
+        `${SD_WEBMAPS}/Webmaps/SD_WM_HistoricDistricts/MapServer/0`,
+        `${SD_WEBMAPS}/Public/HistoricDistricts/MapServer/0`,
+      ],
+      "OBJECTID,DISTRICT_NAME"
+    ),
+    fetchPastPermits(streetPart),
+  ]);
+
+  // 2. Apply parcel data
+  if (parcel.status === "fulfilled" && parcel.value) {
+    const p = parcel.value;
+    result.apn = String(p.APN ?? p.apn ?? "").trim() || undefined;
+    const lotSqft = Number(p.LOT_SQFT ?? p.SHAPE_Area ?? 0);
+    if (lotSqft > 0) result.lot_size_sqft = Math.round(lotSqft);
+    const yearBuilt = Number(p.YEAR_BUILT ?? p.YR_BUILT ?? 0);
+    if (yearBuilt > 1800) result.year_built = yearBuilt;
+    const rawZone = String(p.ZONING ?? p.ZONE_CODE ?? p.ZONE_NAME ?? "").trim();
+    if (rawZone) {
+      result.zone_code = rawZone;
+      result.zone_plain_english = zoneToPlainEnglish(rawZone);
+      result.property_type = zoneToPropertyType(rawZone);
+    }
+    result.data_sources.push("SD Parcel (ArcGIS)");
+  }
+
+  // 3. Apply zoning data
+  if (zoning.status === "fulfilled" && zoning.value) {
+    const z = zoning.value;
+    if (!result.zone_code) {
+      const rawZone = String(z.ZONE_CODE ?? z.ZONE_NAME ?? "").trim();
       if (rawZone) {
         result.zone_code = rawZone;
         result.zone_plain_english = zoneToPlainEnglish(rawZone);
         result.property_type = zoneToPropertyType(rawZone);
       }
-      result.data_sources.push("SD Parcel (ArcGIS)");
-      break;
     }
+    const coastalVal = z.IS_COASTAL ?? z.COASTAL ?? z.OVERLAYS ?? "";
+    if (String(coastalVal).toLowerCase().includes("coastal") || coastalVal === 1 || coastalVal === "Y") {
+      result.is_coastal = true;
+      if (!result.overlays.includes("Coastal Zone")) result.overlays.push("Coastal Zone");
+    }
+    const historicVal = z.IS_HISTORIC ?? z.HISTORIC ?? "";
+    if (String(historicVal).toLowerCase().includes("historic") || historicVal === 1 || historicVal === "Y") {
+      result.is_historic = true;
+      if (!result.overlays.includes("Historic District")) result.overlays.push("Historic District");
+    }
+    result.data_sources.push("SD Zoning (ArcGIS)");
   }
 
-  // 3. Zoning / overlay data
-  const zoningServicePaths = [
-    `${SD_WEBMAPS}/Webmaps/SD_WM_ZoningInfo/MapServer/0`,
-    `${SD_WEBMAPS}/Public/Zoning/MapServer/0`,
-    `${SD_WEBMAPS}/Zoning/Zoning/MapServer/0`,
-  ];
-
-  for (const path of zoningServicePaths) {
-    const zoning = await arcgisPointQuery(path, geo.lat, geo.lng, "ZONE_NAME,ZONE_CODE,OVERLAYS,IS_HISTORIC,HISTORIC,IS_COASTAL,COASTAL,OVERLAY_ZONES");
-    if (zoning) {
-      if (!result.zone_code) {
-        const rawZone = String(zoning.ZONE_CODE ?? zoning.ZONE_NAME ?? "").trim();
-        if (rawZone) {
-          result.zone_code = rawZone;
-          result.zone_plain_english = zoneToPlainEnglish(rawZone);
-          result.property_type = zoneToPropertyType(rawZone);
-        }
-      }
-      // Check coastal
-      const coastal = zoning.IS_COASTAL ?? zoning.COASTAL ?? zoning.OVERLAYS ?? "";
-      if (String(coastal).toLowerCase().includes("coastal") || coastal === 1 || coastal === "Y") {
-        result.is_coastal = true;
-        if (!result.overlays.includes("Coastal Zone")) result.overlays.push("Coastal Zone");
-      }
-      // Check historic
-      const historic = zoning.IS_HISTORIC ?? zoning.HISTORIC ?? "";
-      if (String(historic).toLowerCase().includes("historic") || historic === 1 || historic === "Y") {
-        result.is_historic = true;
-        if (!result.overlays.includes("Historic District")) result.overlays.push("Historic District");
-      }
-      result.data_sources.push("SD Zoning (ArcGIS)");
-      break;
-    }
+  // 4. Apply coastal overlay
+  if (!result.is_coastal && coastal.status === "fulfilled" && coastal.value) {
+    result.is_coastal = true;
+    if (!result.overlays.includes("Coastal Zone")) result.overlays.push("Coastal Zone");
+    result.data_sources.push("SD Coastal Overlay (ArcGIS)");
   }
 
-  // 4. Coastal overlay — separate layer check
-  if (!result.is_coastal) {
-    const coastalPaths = [
-      `${SD_WEBMAPS}/Webmaps/SD_WM_CoastalZone/MapServer/0`,
-      `${SD_WEBMAPS}/Public/CoastalZone/MapServer/0`,
-    ];
-    for (const path of coastalPaths) {
-      const coastal = await arcgisPointQuery(path, geo.lat, geo.lng, "OBJECTID");
-      if (coastal) {
-        result.is_coastal = true;
-        if (!result.overlays.includes("Coastal Zone")) result.overlays.push("Coastal Zone");
-        result.data_sources.push("SD Coastal Overlay (ArcGIS)");
-        break;
-      }
-    }
+  // 5. Apply historic overlay
+  if (!result.is_historic && historic.status === "fulfilled" && historic.value) {
+    result.is_historic = true;
+    const districtName = String(historic.value.DISTRICT_NAME ?? "Historic District");
+    if (!result.overlays.includes(districtName)) result.overlays.push(districtName);
+    result.data_sources.push("SD Historic Districts (ArcGIS)");
   }
 
-  // 5. Historic overlay — separate layer check
-  if (!result.is_historic) {
-    const historicPaths = [
-      `${SD_WEBMAPS}/Webmaps/SD_WM_HistoricDistricts/MapServer/0`,
-      `${SD_WEBMAPS}/Public/HistoricDistricts/MapServer/0`,
-    ];
-    for (const path of historicPaths) {
-      const historic = await arcgisPointQuery(path, geo.lat, geo.lng, "OBJECTID,DISTRICT_NAME");
-      if (historic) {
-        result.is_historic = true;
-        const districtName = String(historic.DISTRICT_NAME ?? "Historic District");
-        if (!result.overlays.includes(districtName)) result.overlays.push(districtName);
-        result.data_sources.push("SD Historic Districts (ArcGIS)");
-        break;
-      }
-    }
-  }
-
-  // 6. Past permits via Socrata
-  const streetPart = address.split(",")[0].trim();
-  result.past_permits = await fetchPastPermits(streetPart);
+  // 6. Apply past permits
+  result.past_permits = pastPermits.status === "fulfilled" ? pastPermits.value : [];
   if (result.past_permits.length > 0) {
     result.data_sources.push("SD County Permits (Socrata)");
   }
 
   return result;
+
 }
 
 // ── Route handler ────────────────────────────────────────
