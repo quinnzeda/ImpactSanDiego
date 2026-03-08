@@ -12,7 +12,7 @@ San Diego's building permit process is opaque and complex. Residents and develop
 
 PermitPal SD provides two access points to demystify the permit process:
 
-1. **MCP Server** (8 tools) - Claude Code/Desktop users can query SD permit data conversationally
+1. **MCP Server** (12 tools) - Claude Code/Desktop users can query SD permit data conversationally
 2. **Next.js Web App** - Interactive UI with AI-powered Q&A flow for precise permit roadmaps
 
 ## Features
@@ -23,7 +23,9 @@ PermitPal SD provides two access points to demystify the permit process:
 - **Municipal Code Lookup**: Browse 10 key building code sections with expandable details
 - **Exemption Checker**: Check if your project qualifies for permit exemption under §129.0203
 - **Skills-Based Knowledge**: Modular domain expertise organized as skill files (permits, ADU, solar) following CrossBeam architecture patterns
-- **OpenDSD Integration**: Look up specific City of San Diego permits by approval ID or project ID
+- **Property Zoning Lookup**: Look up zoning designation, overlays, and parcel data for any SD address via ArcGIS
+- **Project Cost Estimator**: Get itemized cost breakdowns for home improvement projects with SD market data
+- **Permit Detail Lookup**: Look up specific City of San Diego permits by record ID or address
 
 ## Data Sources
 
@@ -31,7 +33,8 @@ PermitPal SD provides two access points to demystify the permit process:
 |--------|------|---------|--------|
 | [SD City Open Data Portal](https://seshat.datasd.org) | CSV bulk download | 256K+ | No auth |
 | [SD County Socrata API](https://data.sandiegocounty.gov/resource/dyzh-7eat.json) | Live REST API | 236K+ | No auth |
-| [OpenDSD](https://opendsd.sandiego.gov) | City permit system | Real-time | Session-based |
+| [SD ArcGIS Services](https://webmaps.sandiego.gov/arcgis/rest/services/DSD) | Zoning/parcel GIS | Real-time | No auth |
+| [Accela Civic Platform](https://developer.accela.com) | City permit system | Real-time | App ID |
 | San Diego Municipal Code | Curated sections | 10 key sections | Local JSON |
 | SD Development Services | Curated knowledge | 13 permit types, 11 FAQs | Local JSON |
 
@@ -40,7 +43,7 @@ PermitPal SD provides two access points to demystify the permit process:
 ```
 permitpal-sd/
 ├── packages/
-│   ├── mcp-server/           # MCP Server (TypeScript) - 8 tools
+│   ├── mcp-server/           # MCP Server (TypeScript) - 12 tools
 │   │   ├── src/
 │   │   │   ├── index.ts      # Server entry + all tool registrations
 │   │   │   ├── tools/        # Tool implementations
@@ -63,18 +66,22 @@ permitpal-sd/
 └── scripts/                  # Data fetch utilities
 ```
 
-## MCP Server Tools (8 total)
+## MCP Server Tools (12 total)
 
 | Tool | Description | Data Source |
 |------|-------------|-------------|
-| `search_permits` | Search City permit records by address/type/status | City CSV (256K+) |
+| `search_permits` | Search City permit records by address/type/status | Accela API / CSV fallback |
 | `search_county_permits` | Live search County permits with full-text search | Socrata API (236K+) |
 | `navigate_permits` | AI-powered permit roadmap with optional Q&A flow | Claude API + knowledge base |
 | `lookup_code` | Search municipal code sections | Curated JSON |
 | `check_exemption` | Check permit exemption eligibility (§129.0203) | Rules engine |
 | `get_permit_stats` | City permit analytics and trends | City CSV |
 | `get_county_permit_stats` | Real-time County permit analytics | Socrata API |
-| `lookup_opendsd` | Look up specific City permits by ID | OpenDSD |
+| `lookup_permit_detail` | Look up specific City permits by ID or address | Accela API / CSV fallback |
+| `search_addresses` | Validate addresses and get location metadata | Accela API |
+| `search_parcels` | Search parcel data by APN, owner, or address | Accela API |
+| `lookup_property_zoning` | Look up zoning, overlays, and parcel data for an address | SD ArcGIS |
+| `estimate_project_cost` | Itemized cost estimate for home improvement projects | SD market data |
 
 ## Quick Start
 
@@ -104,7 +111,8 @@ claude mcp add permitpal -- node /path/to/permitpal-sd/packages/mcp-server/dist/
 # Then ask Claude:
 # "What permits do I need to build an ADU in San Diego?"
 # "Search County permits for solar installations in Escondido"
-# "Look up permit PMT-3240445 on OpenDSD"
+# "What's the zoning for 4225 Park Blvd, San Diego?"
+# "How much would it cost to build an ADU?"
 # "What are the permit exemptions in San Diego?"
 ```
 
