@@ -6,6 +6,7 @@ import { searchPermitsSchema, handleSearchPermits } from "./tools/permit-search.
 import { navigatePermitsSchema, handleNavigatePermits } from "./tools/permit-navigator.js";
 import { codeLookupSchema, handleCodeLookup } from "./tools/code-lookup.js";
 import { checkExemptionSchema, handleCheckExemption } from "./tools/compliance-check.js";
+import { estimateCostSchema, handleEstimateCost } from "./tools/cost-estimator.js";
 import { socrataSearch, socrataGetStats } from "./data/socrata-client.js";
 import {
   validateAccelaConnection,
@@ -15,6 +16,7 @@ import {
   accelaSearchAddresses,
   accelaSearchParcels,
 } from "./data/accela-api.js";
+import { lookupPropertyZoning } from "./data/property-lookup.js";
 import { z } from "zod";
 
 const server = new McpServer({
@@ -388,6 +390,68 @@ server.tool(
   }
 );
 
+// ── Tool 11: Property Zoning Lookup (ArcGIS) ──
+
+server.tool(
+  "lookup_property_zoning",
+  "Look up zoning designation, property type, and overlay restrictions for any San Diego address. Returns the base zone code (e.g., RS-1-7), plain-English zone description, property type (single-family, multi-family, commercial, industrial), lot size, APN, year built, and overlay flags (coastal zone, historic district). Uses City of San Diego ArcGIS services. Call this tool when you need to know a property's zoning before advising on permits, setbacks, height limits, or allowed uses.",
+  {
+    address: z.string().describe("Street address in San Diego (e.g., '4225 Park Blvd, San Diego, CA')"),
+  },
+  async (input) => {
+    const data = await lookupPropertyZoning(input.address);
+
+    if (!data.address) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            error: "Could not geocode address. Make sure it's a valid San Diego address.",
+            suggestion: "Try including street number, name, and 'San Diego, CA'.",
+          }),
+        }],
+      };
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          source: "City of San Diego ArcGIS",
+          address: data.address,
+          coordinates: { lat: data.lat, lng: data.lng },
+          zoning: {
+            zone_code: data.zone_code ?? "Not found",
+            zone_description: data.zone_plain_english ?? "Not found",
+            property_type: data.property_type ?? "unknown",
+          },
+          parcel: {
+            apn: data.apn ?? "Not found",
+            lot_size_sqft: data.lot_size_sqft ?? "Not found",
+            year_built: data.year_built ?? "Not found",
+          },
+          overlays: data.overlays.length > 0 ? data.overlays : "None detected",
+          is_coastal: data.is_coastal,
+          is_historic: data.is_historic,
+          data_sources: data.data_sources,
+        }, null, 2),
+      }],
+    };
+  }
+);
+
+// ── Tool 12: Project Cost Estimator ──
+
+server.tool(
+  "estimate_project_cost",
+  "Estimate total project cost for any San Diego home improvement project. Returns itemized breakdown of construction costs, permit fees (based on City of SD IB-501 fee schedule), professional fees (architect, engineer, etc.), timeline, warnings, and savings tips. Covers ADUs, kitchen/bathroom remodels, solar, room additions, decks, fences, HVAC, roofing, electrical panels, and more. Uses San Diego 2025-2026 market data.",
+  estimateCostSchema.shape,
+  async (input) => {
+    const result = handleEstimateCost(input);
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
 // ── Start server ──
 
 async function main() {
@@ -405,7 +469,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("PermitPal SD MCP Server v3.0 running on stdio (10 tools)");
+  console.error("PermitPal SD MCP Server v3.0 running on stdio (12 tools)");
 }
 
 main().catch((err) => {
