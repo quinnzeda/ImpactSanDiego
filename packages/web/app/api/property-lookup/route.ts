@@ -167,6 +167,11 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   result.lng = geo.lng;
   result.data_sources.push("ArcGIS Geocoder");
 
+  // Early return: skip expensive SD-specific queries for out-of-jurisdiction addresses
+  if (geo.city && geo.city.toLowerCase() !== "san diego") {
+    return result;
+  }
+
   // 2–6. Run all parallel lookups concurrently after geocoding
   const streetPart = address.split(",")[0].trim();
 

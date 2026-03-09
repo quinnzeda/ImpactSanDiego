@@ -20,8 +20,15 @@ function isOutsideSanDiego(property: PropertyLookupData | null): boolean {
   return !!property?.city && property.city.toLowerCase() !== "san diego";
 }
 
-function buildOutsideJurisdictionResponse(property: PropertyLookupData) {
-  const city = property.city ?? "this city";
+function buildVerdictResponse(opts: {
+  level: string;
+  headline: string;
+  reason: string;
+  whatChanges: string;
+  tips: string[];
+  property: PropertyLookupData;
+  notes: string[];
+}) {
   return {
     permits_needed: [],
     exemptions: [],
@@ -29,27 +36,37 @@ function buildOutsideJurisdictionResponse(property: PropertyLookupData) {
     process_steps: [],
     estimated_timeline: "N/A",
     estimated_cost_range: "N/A",
+    tips: opts.tips,
+    canvas: "verdict" as CanvasType,
+    verdict: {
+      level: opts.level,
+      headline: opts.headline,
+      reason: opts.reason,
+      what_changes_everything: opts.whatChanges,
+    },
+    property: mergePropertyData(undefined, opts.property),
+    reliability: { source: "live", notes: opts.notes },
+  };
+}
+
+function buildOutsideJurisdictionResponse(property: PropertyLookupData) {
+  const city = property.city ?? "this city";
+  return buildVerdictResponse({
+    level: "amber",
+    headline: `This address is in ${city}, not the City of San Diego.`,
+    reason: `Our zoning data and permit guidance covers the City of San Diego only. ${city} has its own building department, zoning codes, and permit processes.`,
+    whatChanges: "If you have an address within San Diego city limits, try that instead.",
     tips: [
       `Contact ${city}'s building department for permit requirements.`,
       "San Diego County unincorporated areas are handled by the County Planning & Development Services: (858) 694-2960.",
       "Each city in San Diego County has its own zoning codes and permit processes.",
     ],
-    canvas: "verdict" as CanvasType,
-    verdict: {
-      level: "amber",
-      headline: `This address is in ${city}, not the City of San Diego.`,
-      reason: `Our zoning data and permit guidance covers the City of San Diego only. ${city} has its own building department, zoning codes, and permit processes.`,
-      what_changes_everything: "If you have an address within San Diego city limits, try that instead.",
-    },
-    property: mergePropertyData(undefined, property),
-    reliability: {
-      source: "live",
-      notes: [
-        `Address geocoded to ${city} (outside City of San Diego jurisdiction)`,
-        ...property.data_sources.map((s) => `Data from: ${s}`),
-      ],
-    },
-  };
+    property,
+    notes: [
+      `Address geocoded to ${city} (outside City of San Diego jurisdiction)`,
+      ...property.data_sources.map((s) => `Data from: ${s}`),
+    ],
+  });
 }
 
 function buildAduIneligibleResponse(property: PropertyLookupData) {
@@ -57,34 +74,22 @@ function buildAduIneligibleResponse(property: PropertyLookupData) {
     ? `${property.zone_code} (${property.zone_plain_english ?? property.property_type})`
     : property.property_type ?? "this zone";
 
-  return {
-    permits_needed: [],
-    exemptions: [],
-    forms_required: [],
-    process_steps: [],
-    estimated_timeline: "N/A",
-    estimated_cost_range: "N/A",
+  return buildVerdictResponse({
+    level: "red",
+    headline: `ADUs are not permitted in ${zoneLabel}.`,
+    reason: `This property is zoned ${zoneLabel}, which is a ${property.property_type} zone. Traditional Accessory Dwelling Units (ADUs) are only permitted on residential properties (single-family and multi-family zones) under San Diego Municipal Code §141.0302 and California Government Code §65852.2.`,
+    whatChanges: "A zone change or community plan amendment could potentially enable residential use, but this requires a separate discretionary process. Consult DSD for options.",
     tips: [
       "If this is a mixed-use zone, residential units may be possible through a different permit pathway — consult DSD.",
       "Contact the Development Services Department at (619) 446-5000 for site-specific guidance.",
       "Visit https://www.sandiego.gov/development-services for more information.",
     ],
-    canvas: "verdict" as CanvasType,
-    verdict: {
-      level: "red",
-      headline: `ADUs are not permitted in ${zoneLabel}.`,
-      reason: `This property is zoned ${zoneLabel}, which is a ${property.property_type} zone. Traditional Accessory Dwelling Units (ADUs) are only permitted on residential properties (single-family and multi-family zones) under San Diego Municipal Code §141.0302 and California Government Code §65852.2.`,
-      what_changes_everything: "A zone change or community plan amendment could potentially enable residential use, but this requires a separate discretionary process. Consult DSD for options.",
-    },
-    property: mergePropertyData(undefined, property),
-    reliability: {
-      source: "live",
-      notes: [
-        `Zoning verified via City of San Diego ArcGIS: ${property.zone_code}`,
-        ...property.data_sources.map((s) => `Property data from: ${s}`),
-      ],
-    },
-  };
+    property,
+    notes: [
+      `Zoning verified via City of San Diego ArcGIS: ${property.zone_code}`,
+      ...property.data_sources.map((s) => `Property data from: ${s}`),
+    ],
+  });
 }
 
 function selectCanvas(
