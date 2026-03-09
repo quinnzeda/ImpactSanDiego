@@ -16,6 +16,42 @@ function isAduIneligibleZone(property: PropertyLookupData | null): boolean {
   return property?.property_type === "commercial" || property?.property_type === "industrial";
 }
 
+function isOutsideSanDiego(property: PropertyLookupData | null): boolean {
+  return !!property?.city && property.city.toLowerCase() !== "san diego";
+}
+
+function buildOutsideJurisdictionResponse(property: PropertyLookupData) {
+  const city = property.city ?? "this city";
+  return {
+    permits_needed: [],
+    exemptions: [],
+    forms_required: [],
+    process_steps: [],
+    estimated_timeline: "N/A",
+    estimated_cost_range: "N/A",
+    tips: [
+      `Contact ${city}'s building department for permit requirements.`,
+      "San Diego County unincorporated areas are handled by the County Planning & Development Services: (858) 694-2960.",
+      "Each city in San Diego County has its own zoning codes and permit processes.",
+    ],
+    canvas: "verdict" as CanvasType,
+    verdict: {
+      level: "amber",
+      headline: `This address is in ${city}, not the City of San Diego.`,
+      reason: `Our zoning data and permit guidance covers the City of San Diego only. ${city} has its own building department, zoning codes, and permit processes.`,
+      what_changes_everything: "If you have an address within San Diego city limits, try that instead.",
+    },
+    property: mergePropertyData(undefined, property),
+    reliability: {
+      source: "live",
+      notes: [
+        `Address geocoded to ${city} (outside City of San Diego jurisdiction)`,
+        ...property.data_sources.map((s) => `Data from: ${s}`),
+      ],
+    },
+  };
+}
+
 function buildAduIneligibleResponse(property: PropertyLookupData) {
   const zoneLabel = property.zone_code
     ? `${property.zone_code} (${property.zone_plain_english ?? property.property_type})`
@@ -95,6 +131,11 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("Property lookup error:", e);
     }
+  }
+
+  // Short-circuit: address outside City of San Diego → can't provide guidance
+  if (isOutsideSanDiego(propertyData)) {
+    return NextResponse.json(buildOutsideJurisdictionResponse(propertyData!));
   }
 
   // Short-circuit: ADU in commercial/industrial zone → not eligible

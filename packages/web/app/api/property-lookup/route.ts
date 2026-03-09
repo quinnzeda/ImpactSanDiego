@@ -12,6 +12,7 @@ const SOCRATA_PERMITS = "https://data.sandiegocounty.gov/resource/dyzh-7eat.json
 
 export interface PropertyData {
   address?: string;
+  city?: string;
   lat?: number;
   lng?: number;
   apn?: string;
@@ -74,7 +75,7 @@ function zoneToPlainEnglish(zoneCode: string): string {
 
 async function geocodeAddress(
   address: string
-): Promise<{ lat: number; lng: number; formatted: string } | null> {
+): Promise<{ lat: number; lng: number; formatted: string; city: string } | null> {
   try {
     const query = address.toLowerCase().includes("san diego") ? address : `${address}, San Diego, CA`;
     const url = `${ARCGIS_GEOCODER}?SingleLine=${encodeURIComponent(query)}&outSR=4326&forStorage=false&maxLocations=1&outFields=StAddr,City,RegionAbbr&f=json`;
@@ -87,6 +88,7 @@ async function geocodeAddress(
       lat: candidate.location.y,
       lng: candidate.location.x,
       formatted: candidate.address,
+      city: candidate.attributes?.City ?? "",
     };
   } catch {
     return null;
@@ -160,6 +162,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     return result; // can't do anything without coordinates
   }
   result.address = geo.formatted;
+  result.city = geo.city;
   result.lat = geo.lat;
   result.lng = geo.lng;
   result.data_sources.push("ArcGIS Geocoder");

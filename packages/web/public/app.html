@@ -1186,18 +1186,27 @@ async function startFlow() {
     renderPermitCheck(navData);
     addMsg("I've checked the requirements. Take a look at the permit check on the right.", 'assistant');
 
-    // Check if ADU was blocked by zoning (red verdict)
-    var isAduBlocked = navData.verdict && navData.verdict.level === 'red';
+    // Check if flow was blocked by zoning (red) or jurisdiction (amber with no permits)
+    var verdictLevel = navData.verdict && navData.verdict.level;
+    var isBlocked = verdictLevel === 'red' || (verdictLevel === 'amber' && navData.permits_needed && navData.permits_needed.length === 0);
 
     // After a beat, show property
     setTimeout(function() {
       renderProperty(propData);
       showCanvas('canvas-property');
-      addMsg("I've pulled up your property details. " + (propData.is_coastal ? "<strong>You're in the Coastal Zone</strong> — that adds a coastal development permit." : propData.zone_code ? "Zone: <strong>" + escHtml(propData.zone_code) + "</strong> (" + escHtml(propData.zone_plain_english || propData.property_type || '') + ")." : "No special overlays detected."), 'assistant');
+      if (propData.city && propData.city !== 'San Diego') {
+        addMsg("This address is in <strong>" + escHtml(propData.city) + "</strong>, which is outside the City of San Diego.", 'assistant');
+      } else if (propData.is_coastal) {
+        addMsg("I've pulled up your property details. <strong>You're in the Coastal Zone</strong> — that adds a coastal development permit.", 'assistant');
+      } else if (propData.zone_code) {
+        addMsg("I've pulled up your property details. Zone: <strong>" + escHtml(propData.zone_code) + "</strong> (" + escHtml(propData.zone_plain_english || propData.property_type || '') + ").", 'assistant');
+      } else {
+        addMsg("I've pulled up your property details. No special overlays detected.", 'assistant');
+      }
       state.step = 2;
 
-      // Only show options if the project wasn't blocked by zoning
-      if (!isAduBlocked) {
+      // Only show options if the project wasn't blocked
+      if (!isBlocked) {
         setTimeout(function() {
           renderOptions();
           showCanvas('canvas-options');
@@ -1205,10 +1214,13 @@ async function startFlow() {
           state.step = 3;
         }, 1500);
       } else {
-        // Keep the permit check (red verdict) visible
+        // Keep the permit check verdict visible
         setTimeout(function() {
           showCanvas('canvas-permit');
-          addMsg("Based on the zoning for this address, this project type is <strong>not permitted</strong>. See the details on the right.", 'assistant');
+          var msg = verdictLevel === 'red'
+            ? "Based on the zoning for this address, this project type is <strong>not permitted</strong>. See the details on the right."
+            : "Our guidance covers <strong>City of San Diego</strong> only. See the details on the right for next steps.";
+          addMsg(msg, 'assistant');
         }, 800);
       }
     }, 1500);
@@ -1275,7 +1287,10 @@ function renderPermitCheck(data) {
 // ============================================================
 function renderProperty(data) {
   document.getElementById('propAddress').textContent = data.address || state.address;
-  document.getElementById('propLoc').textContent = data.zone_plain_english || data.zone_code || 'San Diego';
+  var locText = data.zone_plain_english || data.zone_code || '';
+  if (data.city && data.city !== 'San Diego') locText = data.city + (locText ? ' — ' + locText : '');
+  else if (!locText) locText = 'San Diego';
+  document.getElementById('propLoc').textContent = locText;
 
   // Pills
   var pills = document.getElementById('propPills');

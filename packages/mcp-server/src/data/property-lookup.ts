@@ -7,6 +7,7 @@ const SD_WEBMAPS = "https://webmaps.sandiego.gov/arcgis/rest/services";
 
 export interface PropertyZoningData {
   address?: string;
+  city?: string;
   lat?: number;
   lng?: number;
   apn?: string;
@@ -65,7 +66,7 @@ function zoneToPlainEnglish(zoneCode: string): string {
 
 async function geocodeAddress(
   address: string
-): Promise<{ lat: number; lng: number; formatted: string } | null> {
+): Promise<{ lat: number; lng: number; formatted: string; city: string } | null> {
   try {
     const query = address.toLowerCase().includes("san diego") ? address : `${address}, San Diego, CA`;
     const url = `${ARCGIS_GEOCODER}?SingleLine=${encodeURIComponent(query)}&outSR=4326&forStorage=false&maxLocations=1&outFields=StAddr,City,RegionAbbr&f=json`;
@@ -78,6 +79,7 @@ async function geocodeAddress(
       lat: candidate.location.y,
       lng: candidate.location.x,
       formatted: candidate.address,
+      city: candidate.attributes?.City ?? "",
     };
   } catch {
     return null;
@@ -116,6 +118,7 @@ export async function lookupPropertyZoning(address: string): Promise<PropertyZon
     return result;
   }
   result.address = geo.formatted;
+  result.city = geo.city;
   result.lat = geo.lat;
   result.lng = geo.lng;
   result.data_sources.push("ArcGIS Geocoder");
