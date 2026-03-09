@@ -278,6 +278,7 @@ export async function POST(request: NextRequest) {
           // Merge real property data over AI-guessed property fields
           if (propertyData && propertyData.data_sources.length > 0) {
             parsed.property = mergePropertyData(parsed.property, propertyData, property_address);
+            parsed.reliability.source = "live";
             if (propertyData.is_coastal || propertyData.is_historic) {
               parsed.reliability.notes = [
                 ...(parsed.reliability.notes ?? []),
