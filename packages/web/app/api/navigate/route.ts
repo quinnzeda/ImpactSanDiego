@@ -200,15 +200,18 @@ export async function POST(request: NextRequest) {
       // Build a focused prompt based on canvas type — avoid requesting ALL fields
       const coreFields = `"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"..."}],"process_steps":["step 1","step 2"],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."]`;
       const verdictField = `"verdict":{"level":"green|amber|red","headline":"one sentence","reason":"2-3 sentences","what_changes_everything":"key factor"}`;
+      const optionsField = canvasType === "options"
+        ? `,"options":{"adu_types":[{"id":"detached|attached|garage|jadu|conversion","label":"...","description":"one sentence","pros":["..."],"cons":["..."]}],"default_type":"...","size_range":{"min":150,"max":1200,"default":600}}`
+        : "";
 
       const response = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1500,
+        max_tokens: canvasType === "options" ? 2500 : 1500,
         system: systemPrompt,
         messages: [
           {
             role: "user",
-            content: `Provide a concise San Diego permit roadmap.\n\n${userMsg}\n\nRespond ONLY with valid JSON:\n{${coreFields},${verdictField},"canvas":"${canvasType}"}`,
+            content: `Provide a concise San Diego permit roadmap.\n\n${userMsg}\n\nRespond ONLY with valid JSON:\n{${coreFields},${verdictField}${optionsField},"canvas":"${canvasType}"}`,
           },
         ],
       });
@@ -222,6 +225,10 @@ export async function POST(request: NextRequest) {
           if (!parsed.canvas) parsed.canvas = canvasType;
           if (!parsed.reliability)
             parsed.reliability = { source: "ai", notes: ["AI-generated guidance"] };
+          // Ensure ADU options are populated when canvas is "options"
+          if (parsed.canvas === "options" && (!parsed.options?.adu_types || parsed.options.adu_types.length === 0)) {
+            parsed.options = getDefaultAduOptions(propertyData);
+          }
           // Merge real property data over AI-guessed property fields
           if (propertyData && propertyData.data_sources.length > 0) {
             parsed.property = mergePropertyData(parsed.property, propertyData, property_address);
@@ -268,6 +275,31 @@ function mergePropertyData(
     lot_size_sqft: real.lot_size_sqft ?? base.lot_size_sqft ?? null,
     overlays: real.overlays.length > 0 ? real.overlays : (base.overlays ?? []),
     past_permits: real.past_permits.length > 0 ? real.past_permits : (base.past_permits ?? []),
+  };
+}
+
+function getDefaultAduOptions(property?: PropertyLookupData | null) {
+  const isMultiFamily = property?.property_type === "multi-family";
+  if (isMultiFamily) {
+    return {
+      adu_types: [
+        { id: "conversion", label: "Convert Non-Livable Space", description: "Convert storage, laundry, or boiler rooms into dwelling units", pros: ["Uses existing structure", "No additional footprint", "Often lower cost"], cons: ["Limited to existing non-livable areas", "May displace shared amenities"] },
+        { id: "detached", label: "Detached ADU", description: "New standalone structure on the property", pros: ["Design flexibility", "Privacy for tenants", "At least one always allowed"], cons: ["Requires available lot space", "Higher construction cost"] },
+        { id: "attached", label: "Attached ADU", description: "Addition connected to the existing building", pros: ["Shared walls reduce cost", "Less site work"], cons: ["May affect existing building layout", "Design constraints"] },
+      ],
+      default_type: "conversion",
+      size_range: { min: 150, max: 800, default: 500 },
+    };
+  }
+  return {
+    adu_types: [
+      { id: "detached", label: "Detached ADU", description: "Standalone structure separate from the main house", pros: ["Most privacy for tenant", "Design flexibility", "Higher rental income potential"], cons: ["Requires separate utility connections", "Largest site footprint"] },
+      { id: "attached", label: "Attached ADU", description: "Addition connected to the main house", pros: ["Shared walls reduce construction cost", "Less site work required"], cons: ["Less privacy", "May affect main house living space"] },
+      { id: "garage", label: "Garage Conversion", description: "Convert existing attached or detached garage", pros: ["Lowest cost option", "No setback changes needed", "Fastest approval path"], cons: ["Lose garage space", "Limited square footage"] },
+      { id: "jadu", label: "Junior ADU (JADU)", description: "Up to 500 sq ft within existing home footprint", pros: ["Fastest approvals", "No parking required", "No impact fees"], cons: ["Max 500 sq ft", "Owner must occupy primary residence"] },
+    ],
+    default_type: "detached",
+    size_range: { min: 150, max: 1200, default: 600 },
   };
 }
 
@@ -452,70 +484,7 @@ function getFallbackNavigation(
         ],
       };
     } else if (canvas === "options") {
-      if (isMultiFamily) {
-        result.options = {
-          adu_types: [
-            {
-              id: "conversion",
-              label: "Convert Non-Livable Space",
-              description: "Convert storage, laundry, or boiler rooms into dwelling units",
-              pros: ["Uses existing structure", "No additional footprint", "Often lower cost"],
-              cons: ["Limited to existing non-livable areas", "May displace shared amenities"],
-            },
-            {
-              id: "detached",
-              label: "Detached ADU",
-              description: "New standalone structure on the property",
-              pros: ["Design flexibility", "Privacy for tenants", "At least one always allowed"],
-              cons: ["Requires available lot space", "Higher construction cost"],
-            },
-            {
-              id: "attached",
-              label: "Attached ADU",
-              description: "Addition connected to the existing building",
-              pros: ["Shared walls reduce cost", "Less site work"],
-              cons: ["May affect existing building layout", "Design constraints"],
-            },
-          ],
-          default_type: "conversion",
-          size_range: { min: 150, max: 800, default: 500 },
-        };
-      } else {
-        result.options = {
-          adu_types: [
-            {
-              id: "detached",
-              label: "Detached ADU",
-              description: "Standalone structure separate from the main house",
-              pros: ["Most privacy for tenant", "Design flexibility", "Higher rental income potential"],
-              cons: ["Requires separate utility connections", "Largest site footprint"],
-            },
-            {
-              id: "attached",
-              label: "Attached ADU",
-              description: "Addition connected to the main house",
-              pros: ["Shared walls reduce construction cost", "Less site work required"],
-              cons: ["Less privacy", "May affect main house living space"],
-            },
-            {
-              id: "garage",
-              label: "Garage Conversion",
-              description: "Convert existing attached or detached garage",
-              pros: ["Lowest cost option", "No setback changes needed", "Fastest approval path"],
-              cons: ["Lose garage space", "Limited square footage"],
-            },
-            {
-              id: "jadu",
-              label: "Junior ADU (JADU)",
-              description: "Up to 500 sq ft within existing home footprint",
-              pros: ["Fastest approvals", "No parking required", "No impact fees"],
-              cons: ["Max 500 sq ft", "Owner must occupy primary residence"],
-            },
-          ],
-          default_type: "detached",
-          size_range: { min: 150, max: 1200, default: 600 },
-        };
-      }
+      result.options = getDefaultAduOptions(property);
     }
   } else if (desc.includes("solar") || desc.includes("photovoltaic")) {
     (result.permits_needed as Array<{ type: string; name: string; reason: string }>).push(
