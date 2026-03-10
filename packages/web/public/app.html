@@ -1366,9 +1366,14 @@ function renderOptions() {
       state.selectedOption = opt;
       addMsg("Let's go with the <strong>" + escHtml(opt.name) + "</strong> option.", 'user');
       setTimeout(function() {
-        addMsg("Great choice. I've set up a cost calculator on the right — <strong>drag the size slider</strong> to see how the square footage affects your costs.", 'assistant');
+        addMsg("Great choice. I've set up a cost calculator on the right — <strong>drag the size slider</strong> to see how costs change, then hit <strong>Show me my plan</strong> when you're ready.", 'assistant');
         updateCalc();
         showCanvas('canvas-calc');
+        // Scroll canvas to reveal the "Show me my plan" button
+        setTimeout(function() {
+          var panel = document.querySelector('.canvas');
+          if (panel) panel.scrollTop = panel.scrollHeight;
+        }, 100);
         state.step = 4;
       }, 400);
     });

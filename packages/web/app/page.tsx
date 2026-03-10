@@ -235,6 +235,32 @@ export default function Home() {
     }
   }
 
+  async function handleGetPlan(selectedType: string, size: number) {
+    setLoading(true);
+    setResult(null);
+    setMessages((prev) => [...prev, { role: "assistant", content: "Building your step-by-step permit plan..." }]);
+    try {
+      const res = await fetch("/api/navigate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_description: `Build ${selectedType} ADU, ${size} sq ft at ${address}`,
+          property_address: address || undefined,
+          situation: "applying",
+          category: activeCategory || "adu",
+        }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "assistant", content: "Here's your complete permit plan." }]);
+      setResult(data);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, something went wrong generating the plan." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleBack() {
     setAppMode(false);
     setMessages([]);
@@ -504,6 +530,7 @@ export default function Home() {
                     activeSituation={activeSituation}
                     projectDescription={promptValue || address}
                     address={address}
+                    onGetPlan={handleGetPlan}
                   />
                 </div>
               )}
@@ -530,11 +557,13 @@ function CanvasRouter({
   activeSituation,
   projectDescription,
   address,
+  onGetPlan,
 }: {
   result: Record<string, unknown>;
   activeSituation: Situation | null;
   projectDescription: string;
   address: string;
+  onGetPlan?: (selectedType: string, size: number) => void;
 }) {
   const canvas = result.canvas as string | undefined;
   const reliability = result.reliability as Reliability | undefined;
@@ -587,6 +616,7 @@ function CanvasRouter({
           options={result.options as Record<string, unknown> | undefined}
           reliability={reliability}
           property={result.property as Record<string, unknown> | undefined}
+          onGetPlan={onGetPlan}
         />
       );
       break;

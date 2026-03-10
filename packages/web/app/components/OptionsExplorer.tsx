@@ -25,6 +25,7 @@ interface Props {
   options?: Record<string, unknown> | OptionsData;
   reliability?: Reliability;
   property?: Record<string, unknown>;
+  onGetPlan?: (selectedType: string, size: number) => void;
 }
 
 const RELIABILITY_STYLES = {
@@ -51,7 +52,7 @@ function fmt(n: number): string {
   return "$" + n.toLocaleString();
 }
 
-export function OptionsExplorer({ options, reliability, property }: Props) {
+export function OptionsExplorer({ options, reliability, property, onGetPlan }: Props) {
   const o = options as OptionsData | undefined;
   const types = o?.adu_types || [];
   const sizeRange = o?.size_range || { min: 150, max: 1200, default: 600 };
@@ -212,6 +213,23 @@ export function OptionsExplorer({ options, reliability, property }: Props) {
                 Informational only — verify with DSD. {size > 500 && <span className="text-amber-600 font-medium">⚠ Over 500 sq ft adds ~$3,100 in school impact fees.</span>}
               </p>
             </div>
+
+            {/* Get plan CTA */}
+            {onGetPlan && (
+              <div className="mt-5 pt-5 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => onGetPlan(selectedType, size)}
+                  className="w-full flex items-center justify-center gap-2 text-[1rem] font-semibold text-white bg-sage-500 border-none rounded-[10px] py-3.5 px-6 transition-all duration-150 hover:bg-sage-600 hover:-translate-y-px active:translate-y-0 cursor-pointer"
+                >
+                  Show me my permit plan
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </>
         )}
 
