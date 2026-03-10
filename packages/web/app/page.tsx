@@ -551,9 +551,11 @@ export default function Home() {
                   </div>
                 ))}
                 {loading && (
-                  <div className="flex flex-col items-start">
-                    <div className="bg-stone-100 text-stone-400 px-4 py-3 rounded-[14px] rounded-bl-[4px] text-[0.9375rem]">
-                      Thinking…
+                  <div className="flex flex-col items-start animate-fade-in">
+                    <div className="bg-stone-100 px-4 py-3.5 rounded-[14px] rounded-bl-[4px] flex items-center gap-[5px]">
+                      <span className="thinking-dot" />
+                      <span className="thinking-dot" />
+                      <span className="thinking-dot" />
                     </div>
                   </div>
                 )}
