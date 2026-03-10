@@ -38,6 +38,7 @@ export interface PropertyData {
   in_coastal_height_limit?: boolean;
   past_permits: Array<{ number: string; type: string; year?: number; status?: string }>;
   data_sources: string[];
+  field_sources: Record<string, string>;
 }
 
 // Map San Diego zone code prefix to plain-English property type
@@ -165,6 +166,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     is_historic: false,
     past_permits: [],
     data_sources: [],
+    field_sources: {},
   };
 
   // 1. Geocode
@@ -242,35 +244,42 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     ),
   ]);
 
-  // 2. Apply parcel data
+  // 2. Apply parcel data (lot size, APN, year built — NOT zone code)
   if (parcel.status === "fulfilled" && parcel.value) {
     const p = parcel.value;
     result.apn = String(p.APNID ?? p.APN ?? p.apn ?? "").trim() || undefined;
-    const lotSqft = Number(p.LOT_SQFT ?? p.Shape_Area ?? p.SHAPE_Area ?? 0);
-    if (lotSqft > 0) result.lot_size_sqft = Math.round(lotSqft);
+    if (result.apn) result.field_sources.apn = "SD County Assessor (via GIS)";
+    // Lot size priority: ACREAGE (most reliable) > Shape_Area (projected CRS, sq ft)
+    // Avoid LOT_SQFT — not a standard ArcGIS field and may not exist
     const acreage = Number(p.ACREAGE ?? 0);
-    if (acreage > 0 && !result.lot_size_sqft) result.lot_size_sqft = Math.round(acreage * 43560);
+    const shapeArea = Number(p.Shape_Area ?? p.SHAPE_Area ?? 0);
+    if (acreage > 0) {
+      result.lot_size_sqft = Math.round(acreage * 43560);
+      result.field_sources.lot_size = "SD County Assessor (via GIS)";
+    } else if (shapeArea > 0) {
+      // Shape_Area from SD DSD/Basemap is in sq feet (State Plane CA Zone 6)
+      result.lot_size_sqft = Math.round(shapeArea);
+      result.field_sources.lot_size = "SD Parcel GIS (computed area)";
+    }
     const yearBuilt = Number(p.YEAR_BUILT ?? p.YR_BUILT ?? 0);
-    if (yearBuilt > 1800) result.year_built = yearBuilt;
-    const rawZone = String(p.ZONING ?? p.ZONE_CODE ?? p.ZONE_NAME ?? "").trim();
+    if (yearBuilt > 1800) {
+      result.year_built = yearBuilt;
+      result.field_sources.year_built = "SD County Assessor (via GIS)";
+    }
+    // NOTE: Do NOT use parcel layer ZONING field — it may be stale.
+    // Zone code comes from the authoritative DSD/Zoning_Base layer below.
+    result.data_sources.push("SD Parcel (ArcGIS)");
+  }
+
+  // 3. Apply zoning data (authoritative source for zone code)
+  if (zoning.status === "fulfilled" && zoning.value) {
+    const z = zoning.value;
+    const rawZone = String(z.ZONE_CODE ?? z.ZONE_NAME ?? "").trim();
     if (rawZone) {
       result.zone_code = rawZone;
       result.zone_plain_english = zoneToPlainEnglish(rawZone);
       result.property_type = zoneToPropertyType(rawZone);
-    }
-    result.data_sources.push("SD Parcel (ArcGIS)");
-  }
-
-  // 3. Apply zoning data
-  if (zoning.status === "fulfilled" && zoning.value) {
-    const z = zoning.value;
-    if (!result.zone_code) {
-      const rawZone = String(z.ZONE_CODE ?? z.ZONE_NAME ?? "").trim();
-      if (rawZone) {
-        result.zone_code = rawZone;
-        result.zone_plain_english = zoneToPlainEnglish(rawZone);
-        result.property_type = zoneToPropertyType(rawZone);
-      }
+      result.field_sources.zone = "SD Zoning Base (ArcGIS DSD/Zoning_Base)";
     }
     const coastalVal = z.IS_COASTAL ?? z.COASTAL ?? z.OVERLAYS ?? "";
     if (String(coastalVal).toLowerCase().includes("coastal") || coastalVal === 1 || coastalVal === "Y") {
@@ -283,6 +292,16 @@ async function lookupProperty(address: string): Promise<PropertyData> {
       if (!result.overlays.includes("Historic District")) result.overlays.push("Historic District");
     }
     result.data_sources.push("SD Zoning (ArcGIS)");
+  }
+
+  // 3b. Fallback: if zoning base layer had no zone, try parcel layer ZONING field
+  if (!result.zone_code && parcel.status === "fulfilled" && parcel.value) {
+    const rawZone = String(parcel.value.ZONING ?? parcel.value.ZONE_CODE ?? parcel.value.ZONE_NAME ?? "").trim();
+    if (rawZone) {
+      result.zone_code = rawZone;
+      result.zone_plain_english = zoneToPlainEnglish(rawZone);
+      result.property_type = zoneToPropertyType(rawZone);
+    }
   }
 
   // 4. Apply coastal overlay
@@ -304,6 +323,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   result.past_permits = pastPermits.status === "fulfilled" ? pastPermits.value : [];
   if (result.past_permits.length > 0) {
     result.data_sources.push("SD County Permits (Socrata)");
+    result.field_sources.past_permits = "SD County Open Data (Socrata)";
   }
 
   // 7. Apply community plan area
@@ -312,6 +332,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     if (cpName) {
       result.community_plan_area = cpName;
       result.data_sources.push("SD Community Plans (ArcGIS)");
+      result.field_sources.community = "SD Community Plans (ArcGIS)";
     }
   }
 
@@ -321,6 +342,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     if (district > 0) {
       result.council_district = district;
       result.data_sources.push("SD Council Districts (ArcGIS)");
+      result.field_sources.council_district = "City of San Diego GIS";
     }
   }
 
@@ -348,6 +370,12 @@ async function lookupProperty(address: string): Promise<PropertyData> {
         result.zone_code, result.lot_size_sqft
       );
       result.data_sources.push("SDMC Ch. 13 (derived)");
+      const codeRef = rules.code_reference || "SDMC Ch. 13";
+      result.field_sources.max_height = result.in_coastal_height_limit
+        ? "Coastal Height Limit Overlay (Prop D) + " + codeRef
+        : codeRef;
+      result.field_sources.setbacks = `${codeRef} (${result.zone_code})`;
+      result.field_sources.allowed_units = `${codeRef} (density calc)`;
     }
   }
 

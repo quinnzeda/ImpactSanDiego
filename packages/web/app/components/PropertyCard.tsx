@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface PastPermit {
   number: string;
   type?: string;
@@ -29,6 +31,7 @@ interface PropertyData {
   in_coastal_height_limit?: boolean;
   past_permits?: PastPermit[];
   data_sources?: string[];
+  field_sources?: Record<string, string>;
 }
 
 interface Props {
@@ -84,7 +87,11 @@ export function PropertyCard({ property, showCta }: Props) {
 
   if (!hasAnyData) return null;
 
-  // Build subtitle: "Ocean Beach, San Diego · Council District 2"
+  const fs = p?.field_sources ?? {};
+  const currentYear = new Date().getFullYear();
+  const historicAgeThreshold = currentYear - 45;
+
+  // Build subtitle: "Ocean Beach, San Diego · Council District 2 · Zone RS-1-7"
   const subtitleParts: string[] = [];
   if (p?.community_plan_area) {
     subtitleParts.push(titleCase(p.community_plan_area) + ", San Diego");
@@ -92,35 +99,39 @@ export function PropertyCard({ property, showCta }: Props) {
   if (p?.council_district) {
     subtitleParts.push(`Council District ${p.council_district}`);
   }
+  if (p?.zone_code) {
+    subtitleParts.push(`Zone ${p.zone_code}`);
+  }
   const subtitle = subtitleParts.join(" · ");
 
   // Build overlay pills
   const overlayPills: Array<{ label: string; style: string }> = [];
-  if (p?.is_coastal || p?.overlays?.some((ov) => /coastal/i.test(ov))) {
+  if (p?.is_coastal || p?.overlays?.some((ov) => /coastal zone/i.test(ov))) {
     overlayPills.push({
       label: "Coastal Zone",
       style: "bg-blue-100 text-blue-700 border-blue-200",
     });
   }
+  // Historic district badge — only when actually in a historic overlay
   if (p?.is_historic || p?.overlays?.some((ov) => /historic/i.test(ov))) {
-    const label =
-      p?.year_built && p.year_built < 1980
-        ? `Pre-1980 · Historic review`
-        : "Historic District";
     overlayPills.push({
-      label,
-      style: "bg-amber-100 text-amber-700 border-amber-200",
-    });
-  } else if (p?.year_built && p.year_built < 1980) {
-    overlayPills.push({
-      label: "Pre-1980 · Historic review possible",
+      label: "Historic District",
       style: "bg-amber-100 text-amber-700 border-amber-200",
     });
   }
-  // Other overlays
+  // Other overlays (skip ones already represented by pills above)
   if (p?.overlays) {
     for (const ov of p.overlays) {
-      if (/coastal/i.test(ov) || /historic/i.test(ov)) continue;
+      if (/coastal zone/i.test(ov)) continue;
+      if (/historic/i.test(ov)) continue;
+      // Show coastal height limitation as its own pill
+      if (/coastal height/i.test(ov)) {
+        overlayPills.push({
+          label: "30 ft Height Limit (Prop D)",
+          style: "bg-sky-50 text-sky-700 border-sky-200",
+        });
+        continue;
+      }
       overlayPills.push({
         label: ov,
         style: "bg-stone-100 text-stone-600 border-stone-200",
@@ -136,6 +147,19 @@ export function PropertyCard({ property, showCta }: Props) {
   const compactPermits = p?.past_permits?.length
     ? formatCompactPermits(p.past_permits)
     : null;
+
+  // Height note: if in coastal height limit, say so clearly (not "may be lower")
+  const heightNote = p?.in_coastal_height_limit
+    ? "Coastal Height Limit (Prop D)"
+    : p?.height_note
+    ? p.height_note.split(";")[0]
+    : undefined;
+
+  // Year built note: rolling 45-year threshold per SDMC §143.0212
+  const yearBuiltNote =
+    p?.year_built && p.year_built <= historicAgeThreshold
+      ? "May require historic screening (SDMC §143.0212)"
+      : undefined;
 
   return (
     <div className="bg-white border border-stone-200 rounded-[14px] overflow-hidden animate-slide-up">
@@ -166,6 +190,13 @@ export function PropertyCard({ property, showCta }: Props) {
           </div>
         )}
 
+        {/* APN line */}
+        {p?.apn && (
+          <p className="text-[0.6875rem] text-stone-400 mb-3">
+            APN {p.apn}
+          </p>
+        )}
+
         {/* Data grid */}
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           {/* YOUR LOT */}
@@ -173,6 +204,7 @@ export function PropertyCard({ property, showCta }: Props) {
             <InfoCard
               label="Your lot"
               value={`${p.lot_size_sqft.toLocaleString()} sq ft`}
+              source={fs.lot_size}
             />
           )}
 
@@ -181,7 +213,8 @@ export function PropertyCard({ property, showCta }: Props) {
             <InfoCard
               label="What you can build"
               value={p.allowed_units_description}
-              note={p.zone_code ? `Zone ${p.zone_code}` : undefined}
+              note={p.zone_plain_english || undefined}
+              source={fs.allowed_units}
             />
           )}
 
@@ -190,13 +223,8 @@ export function PropertyCard({ property, showCta }: Props) {
             <InfoCard
               label="Max height"
               value={`${p.max_height_ft} ft`}
-              note={
-                p.in_coastal_height_limit
-                  ? "May be lower near coast"
-                  : p.height_note
-                  ? p.height_note.split(";")[0]
-                  : undefined
-              }
+              note={heightNote}
+              source={fs.max_height}
             />
           )}
 
@@ -205,22 +233,20 @@ export function PropertyCard({ property, showCta }: Props) {
             <InfoCard
               label="Year built"
               value={String(p.year_built)}
-              note={
-                p.year_built < 1980
-                  ? "Triggers historic review"
-                  : undefined
-              }
+              note={yearBuiltNote}
+              source={fs.year_built}
             />
           )}
 
           {/* SETBACKS */}
           {hasSetbacks && (
             <InfoCard
-              label="Distance from edges"
+              label="Setbacks"
               value={[p?.front_setback_ft, p?.side_setback_ft, p?.rear_setback_ft]
-                .map((v) => (v != null ? `${v}ft` : "–"))
+                .map((v) => (v != null ? `${v}ft` : "\u2013"))
                 .join(" · ")}
               note="Front · Sides · Rear"
+              source={fs.setbacks}
             />
           )}
 
@@ -229,6 +255,7 @@ export function PropertyCard({ property, showCta }: Props) {
             <InfoCard
               label="Past permits"
               value={compactPermits}
+              source={fs.past_permits}
             />
           )}
         </div>
@@ -255,7 +282,7 @@ export function PropertyCard({ property, showCta }: Props) {
       {p?.data_sources && p.data_sources.length > 0 && (
         <div className="px-5 py-3 border-t border-stone-100">
           <p className="text-[0.6875rem] text-stone-400 leading-relaxed">
-            {friendlySourceNames(p.data_sources)}
+            Sources: {friendlySourceNames(p.data_sources)}
           </p>
         </div>
       )}
@@ -276,19 +303,40 @@ function InfoCard({
   label,
   value,
   note,
+  source,
 }: {
   label: string;
   value: string;
   note?: string;
+  source?: string;
 }) {
+  const [showSource, setShowSource] = useState(false);
+
   return (
-    <div className="bg-stone-50 rounded-[10px] px-3.5 py-2.5">
-      <p className="text-[0.6875rem] font-semibold text-stone-400 uppercase tracking-wide mb-1">
-        {label}
-      </p>
+    <div className="bg-stone-50 rounded-[10px] px-3.5 py-2.5 relative group">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[0.6875rem] font-semibold text-stone-400 uppercase tracking-wide">
+          {label}
+        </p>
+        {source && (
+          <button
+            type="button"
+            className="text-stone-300 hover:text-stone-500 transition-colors text-[0.6875rem] leading-none"
+            onClick={() => setShowSource(!showSource)}
+            aria-label={`Data source for ${label}`}
+          >
+            i
+          </button>
+        )}
+      </div>
       <p className="text-[0.9375rem] font-semibold text-stone-900">{value}</p>
       {note && (
         <p className="text-[0.75rem] text-stone-500 mt-0.5">{note}</p>
+      )}
+      {showSource && source && (
+        <p className="text-[0.625rem] text-stone-400 mt-1 italic">
+          {source}
+        </p>
       )}
     </div>
   );
