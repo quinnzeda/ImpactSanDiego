@@ -28,6 +28,12 @@
   --amber-500: oklch(74%  0.128 62);
   --amber-700: oklch(56%  0.118 52);
 
+  /* Blue (coastal) */
+  --blue-50:  oklch(97%  0.015 240);
+  --blue-100: oklch(94%  0.035 240);
+  --blue-200: oklch(88%  0.060 240);
+  --blue-700: oklch(48%  0.100 240);
+
   /* Semantic tokens */
   --background:    var(--stone-50);
   --foreground:    var(--stone-900);
@@ -77,6 +83,11 @@
   --color-amber-100: var(--amber-100);
   --color-amber-500: var(--amber-500);
   --color-amber-700: var(--amber-700);
+
+  --color-blue-50:  var(--blue-50);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-blue-700: var(--blue-700);
 
   /* Fonts */
   --font-sans:  var(--font-dmsans), system-ui, sans-serif;

@@ -320,8 +320,22 @@ function mergePropertyData(
     zone_code: real.zone_code ?? base.zone_code ?? null,
     zone_plain_english: real.zone_plain_english ?? base.zone_plain_english ?? null,
     lot_size_sqft: real.lot_size_sqft ?? base.lot_size_sqft ?? null,
+    year_built: real.year_built ?? base.year_built ?? null,
     overlays: real.overlays.length > 0 ? real.overlays : (base.overlays ?? []),
     past_permits: real.past_permits.length > 0 ? real.past_permits : (base.past_permits ?? []),
+    community_plan_area: real.community_plan_area ?? base.community_plan_area ?? null,
+    council_district: real.council_district ?? base.council_district ?? null,
+    max_height_ft: real.max_height_ft ?? base.max_height_ft ?? null,
+    height_note: real.height_note ?? base.height_note ?? null,
+    front_setback_ft: real.front_setback_ft ?? base.front_setback_ft ?? null,
+    side_setback_ft: real.side_setback_ft ?? base.side_setback_ft ?? null,
+    rear_setback_ft: real.rear_setback_ft ?? base.rear_setback_ft ?? null,
+    setback_note: real.setback_note ?? base.setback_note ?? null,
+    allowed_units_description: real.allowed_units_description ?? base.allowed_units_description ?? null,
+    is_coastal: real.is_coastal ?? base.is_coastal ?? false,
+    is_historic: real.is_historic ?? base.is_historic ?? false,
+    in_coastal_height_limit: real.in_coastal_height_limit ?? base.in_coastal_height_limit ?? null,
+    data_sources: real.data_sources,
   };
 }
 

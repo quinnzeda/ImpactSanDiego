@@ -99,6 +99,7 @@ export default function Home() {
   const [messages,   setMessages]   = useState<ChatMessage[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState<Record<string, unknown> | null>(null);
+  const [propertyData, setPropertyData] = useState<Record<string, unknown> | null>(null);
   const [chatInput,  setChatInput]  = useState("");
 
   const promptRef      = useRef<HTMLTextAreaElement>(null);
@@ -178,9 +179,18 @@ export default function Home() {
     setAppMode(true);
     setLoading(true);
     setResult(null);
+    setPropertyData(null);
 
     try {
-      const res = await fetch("/api/navigate", {
+      // Fire both calls in parallel — property lookup resolves first (no AI)
+      const propertyPromise = address.trim()
+        ? fetch(`/api/property-lookup?address=${encodeURIComponent(address)}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => { if (data) setPropertyData(data); return data; })
+            .catch(() => null)
+        : Promise.resolve(null);
+
+      const navigatePromise = fetch("/api/navigate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -192,8 +202,10 @@ export default function Home() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to get permit guidance");
-      const data = await res.json();
+      const [, navRes] = await Promise.all([propertyPromise, navigatePromise]);
+
+      if (!navRes.ok) throw new Error("Failed to get permit guidance");
+      const data = await navRes.json();
       setResult(data);
     } catch (err) {
       console.error(err);
@@ -265,6 +277,7 @@ export default function Home() {
     setAppMode(false);
     setMessages([]);
     setResult(null);
+    setPropertyData(null);
     setLoading(false);
   }
 
@@ -518,12 +531,23 @@ export default function Home() {
 
             {/* Canvas panel */}
             <div className="bg-stone-50 overflow-y-auto flex flex-col">
-              {loading && (
+              {/* Property card appears early from separate lookup */}
+              {propertyData && !result && (
+                <div className="p-6 flex flex-col gap-4">
+                  <PropertyCard property={propertyData} showCta />
+                  {loading && (
+                    <div className="flex items-center justify-center py-8">
+                      <CanvasLoading />
+                    </div>
+                  )}
+                </div>
+              )}
+              {!propertyData && loading && (
                 <div className="flex-1 flex items-center justify-center p-8">
                   <CanvasLoading />
                 </div>
               )}
-              {!loading && result && (
+              {result && (
                 <div className="p-6 flex flex-col gap-4">
                   <CanvasRouter
                     result={result}
@@ -531,10 +555,11 @@ export default function Home() {
                     projectDescription={promptValue || address}
                     address={address}
                     onGetPlan={handleGetPlan}
+                    earlyPropertyData={propertyData}
                   />
                 </div>
               )}
-              {!loading && !result && (
+              {!loading && !result && !propertyData && (
                 <div className="flex-1 flex items-center justify-center p-8">
                   <CanvasEmpty title={canvasContent.title} desc={canvasContent.desc} />
                 </div>
@@ -558,16 +583,23 @@ function CanvasRouter({
   projectDescription,
   address,
   onGetPlan,
+  earlyPropertyData,
 }: {
   result: Record<string, unknown>;
   activeSituation: Situation | null;
   projectDescription: string;
   address: string;
   onGetPlan?: (selectedType: string, size: number) => void;
+  earlyPropertyData?: Record<string, unknown> | null;
 }) {
   const canvas = result.canvas as string | undefined;
   const reliability = result.reliability as Reliability | undefined;
-  const hasProperty = result.property != null && typeof result.property === "object";
+
+  // Use property from result (merged with real data) or fall back to early lookup
+  const propertySource =
+    (result.property as Record<string, unknown> | undefined) ??
+    (earlyPropertyData as Record<string, unknown> | undefined);
+  const hasProperty = propertySource != null;
 
   const effectiveCanvas =
     canvas ||
@@ -615,7 +647,7 @@ function CanvasRouter({
         <OptionsExplorer
           options={result.options as Record<string, unknown> | undefined}
           reliability={reliability}
-          property={result.property as Record<string, unknown> | undefined}
+          property={propertySource}
           onGetPlan={onGetPlan}
         />
       );
@@ -627,10 +659,7 @@ function CanvasRouter({
   return (
     <>
       {hasProperty && (
-        <PropertyCard
-          property={result.property as Record<string, unknown> | undefined}
-          reliability={reliability}
-        />
+        <PropertyCard property={propertySource} />
       )}
       {primaryCard}
     </>

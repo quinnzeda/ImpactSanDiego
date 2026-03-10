@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getZoneDevelopmentRules, getAllowedUnitsDescription } from "../../lib/zone-rules";
 
 // ArcGIS World Geocoder (public, no auth required)
 const ARCGIS_GEOCODER =
@@ -25,6 +26,16 @@ export interface PropertyData {
   is_coastal: boolean;
   is_historic: boolean;
   near_transit?: boolean;
+  community_plan_area?: string;
+  council_district?: number;
+  max_height_ft?: number;
+  height_note?: string;
+  front_setback_ft?: number;
+  side_setback_ft?: number;
+  rear_setback_ft?: number;
+  setback_note?: string;
+  allowed_units_description?: string;
+  in_coastal_height_limit?: boolean;
   past_permits: Array<{ number: string; type: string; year?: number; status?: string }>;
   data_sources: string[];
 }
@@ -183,7 +194,7 @@ async function lookupProperty(address: string): Promise<PropertyData> {
     return null;
   }
 
-  const [parcel, zoning, coastal, historic, pastPermits] = await Promise.allSettled([
+  const [parcel, zoning, coastal, historic, pastPermits, communityPlan, councilDistrict, coastalHeight] = await Promise.allSettled([
     firstHit(
       [
         `${SD_WEBMAPS}/DSD/Basemap/MapServer/15`,
@@ -214,6 +225,21 @@ async function lookupProperty(address: string): Promise<PropertyData> {
       "*"
     ),
     fetchPastPermits(streetPart),
+    // Community Plan Area
+    arcgisPointQuery(
+      `${SD_WEBMAPS}/DSD/Planning/MapServer/2`,
+      geo!.lat, geo!.lng, "CPNAME"
+    ),
+    // Council District
+    arcgisPointQuery(
+      `${SD_WEBMAPS}/DSD/Basemap/MapServer/7`,
+      geo!.lat, geo!.lng, "DISTRICT,NAME"
+    ),
+    // Coastal Height Limitation Overlay
+    arcgisPointQuery(
+      `${SD_WEBMAPS}/DSD/Zoning_Overlay/MapServer/1`,
+      geo!.lat, geo!.lng, "ZONENAME"
+    ),
   ]);
 
   // 2. Apply parcel data
@@ -278,6 +304,51 @@ async function lookupProperty(address: string): Promise<PropertyData> {
   result.past_permits = pastPermits.status === "fulfilled" ? pastPermits.value : [];
   if (result.past_permits.length > 0) {
     result.data_sources.push("SD County Permits (Socrata)");
+  }
+
+  // 7. Apply community plan area
+  if (communityPlan.status === "fulfilled" && communityPlan.value) {
+    const cpName = String(communityPlan.value.CPNAME ?? "").trim();
+    if (cpName) {
+      result.community_plan_area = cpName;
+      result.data_sources.push("SD Community Plans (ArcGIS)");
+    }
+  }
+
+  // 8. Apply council district
+  if (councilDistrict.status === "fulfilled" && councilDistrict.value) {
+    const district = Number(councilDistrict.value.DISTRICT);
+    if (district > 0) {
+      result.council_district = district;
+      result.data_sources.push("SD Council Districts (ArcGIS)");
+    }
+  }
+
+  // 9. Apply coastal height limitation
+  if (coastalHeight.status === "fulfilled" && coastalHeight.value) {
+    result.in_coastal_height_limit = true;
+  }
+
+  // 10. Derive development rules from zone code
+  if (result.zone_code) {
+    const rules = getZoneDevelopmentRules(result.zone_code);
+    if (rules) {
+      result.max_height_ft = rules.max_height_ft ?? undefined;
+      result.height_note = rules.height_note;
+      result.front_setback_ft = rules.front_setback_ft;
+      result.side_setback_ft = rules.side_setback_ft;
+      result.rear_setback_ft = rules.rear_setback_ft;
+      result.setback_note = rules.setback_note;
+      // Cap height if in coastal height limit zone
+      if (result.in_coastal_height_limit && result.max_height_ft && result.max_height_ft > 30) {
+        result.max_height_ft = 30;
+        result.height_note = "Capped at 30 ft (Coastal Height Limitation Overlay)";
+      }
+      result.allowed_units_description = getAllowedUnitsDescription(
+        result.zone_code, result.lot_size_sqft
+      );
+      result.data_sources.push("SDMC Ch. 13 (derived)");
+    }
   }
 
   return result;

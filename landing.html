@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Permit Buddy — San Diego</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       DESIGN TOKENS
+    ============================================================ */
+    :root {
+      --stone-50:  oklch(97.5% 0.005 75);
+      --stone-100: oklch(93.5% 0.009 75);
+      --stone-200: oklch(88%   0.012 75);
+      --stone-300: oklch(80%   0.014 75);
+      --stone-500: oklch(62%   0.016 75);
+      --stone-600: oklch(50%   0.014 75);
+      --stone-700: oklch(37%   0.012 75);
+      --stone-900: oklch(22%   0.008 240);
+
+      --sage-50:  oklch(97%   0.016 158);
+      --sage-100: oklch(92%   0.034 158);
+      --sage-200: oklch(84%   0.060 158);
+      --sage-300: oklch(74%   0.082 158);
+      --sage-500: oklch(58%   0.105 158);
+      --sage-600: oklch(50%   0.098 158);
+      --sage-700: oklch(42%   0.088 158);
+
+      --amber-100: oklch(94%   0.042 72);
+      --amber-500: oklch(74%   0.128 62);
+      --amber-700: oklch(56%   0.118 52);
+
+      --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+      --font-sans:  'DM Sans', system-ui, sans-serif;
+
+      --radius-sm:   6px;
+      --radius-md:  10px;
+      --radius-lg:  14px;
+      --radius-pill: 100px;
+    }
+
+    /* ============================================================
+       RESET
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background: var(--stone-50);
+      color: var(--stone-900);
+      font-family: var(--font-sans);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    button   { font-family: inherit; cursor: pointer; }
+    textarea { font-family: inherit; }
+
+    /* ============================================================
+       LANDING PAGE
+    ============================================================ */
+    #landing {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Nav ---- */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem clamp(1.5rem, 6vw, 4rem);
+      flex-shrink: 0;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      text-decoration: none;
+      color: var(--stone-900);
+    }
+
+    .logo-mark {
+      width: 34px;
+      height: 34px;
+      background: var(--sage-500);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-mark svg { width: 18px; height: 18px; color: white; }
+
+    .logo-name {
+      font-family: var(--font-serif);
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-tag {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--stone-600);
+      background: var(--stone-100);
+      border: 1px solid var(--stone-200);
+      padding: 0.3rem 0.75rem;
+      border-radius: var(--radius-pill);
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-inline: clamp(1.25rem, 5vw, 3rem);
+      padding-block: 1.5rem 2rem;
+    }
+
+    .hero-content {
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+
+    /* ---- Heading block ---- */
+    .heading-block {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .eyebrow {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--stone-500);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .headline {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 4vw, 2.875rem);
+      font-weight: 600;
+      line-height: 1.12;
+      letter-spacing: -0.025em;
+      color: var(--stone-900);
+    }
+
+    .headline em {
+      font-style: italic;
+      color: var(--sage-600);
+    }
+
+    .subheadline {
+      font-size: clamp(0.9375rem, 1.4vw, 1rem);
+      font-weight: 400;
+      line-height: 1.7;
+      color: var(--stone-600);
+    }
+
+    .section-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--stone-500);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    /* ---- Situation cards (Level 1) ---- */
+    .situation-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.625rem;
+      margin-top: -1.125rem; /* pulls cards tight to the label above */
+    }
+
+    .situation-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      padding: 0.75rem 1rem;
+      background: white;
+      border: 1.5px solid var(--stone-200);
+      border-radius: var(--radius-lg);
+      text-align: left;
+      transition: border-color 0.15s ease-out, background 0.15s ease-out, box-shadow 0.15s ease-out;
+    }
+
+    .situation-card:hover {
+      border-color: var(--sage-200);
+      background: var(--sage-50);
+    }
+
+    .situation-card.active {
+      border-color: var(--sage-500);
+      background: var(--sage-50);
+      box-shadow: 0 0 0 3px oklch(58% 0.105 158 / 0.10);
+    }
+
+    .situation-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--stone-100);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s ease-out;
+    }
+
+    .situation-card.active .situation-icon { background: var(--sage-100); }
+
+    .situation-icon svg {
+      width: 15px;
+      height: 15px;
+      color: var(--stone-500);
+      transition: color 0.15s ease-out;
+    }
+
+    .situation-card.active .situation-icon svg { color: var(--sage-600); }
+
+    .situation-label {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--stone-900);
+      line-height: 1.3;
+    }
+
+    .situation-sub {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--stone-500);
+      line-height: 1.4;
+    }
+
+    /* ---- Project chips (Level 2) ---- */
+    .project-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      animation: fadeSlideIn 0.22s ease-out both;
+    }
+
+    .category-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--stone-500);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .chip {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--stone-700);
+      background: var(--stone-100);
+      border: 1.5px solid var(--stone-200);
+      padding: 0.4375rem 1rem;
+      border-radius: var(--radius-pill);
+      transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out;
+      user-select: none;
+      line-height: 1;
+    }
+
+    .chip:hover {
+      background: var(--sage-50);
+      border-color: var(--sage-200);
+      color: var(--sage-700);
+    }
+
+    .chip.active {
+      background: var(--sage-500);
+      border-color: var(--sage-500);
+      color: white;
+    }
+
+    /* ---- Example prompts ---- */
+    .examples-wrap {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .examples-wrap.open { grid-template-rows: 1fr; }
+
+    .examples-inner { overflow: hidden; }
+
+    .suggestions-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--stone-500);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      padding-top: 0.75rem;
+      display: block;
+    }
+
+    .examples-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .example {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--stone-700);
+      background: var(--stone-100);
+      border: 1.5px solid var(--stone-200);
+      padding: 0.375rem 0.75rem;
+      border-radius: var(--radius-pill);
+      text-align: left;
+      transition: border-color 0.15s ease-out, background 0.15s ease-out, color 0.15s ease-out;
+      line-height: 1.3;
+    }
+
+    .example:hover {
+      background: var(--sage-50);
+      border-color: var(--sage-200);
+      color: var(--sage-700);
+    }
+
+    .example.selected {
+      background: var(--sage-100);
+      border-color: var(--sage-400);
+      color: var(--sage-700);
+    }
+
+    .example                    { animation: exampleIn 0.22s ease-out both; }
+    .example:nth-child(1)       { animation-delay:   0ms; }
+    .example:nth-child(2)       { animation-delay:  45ms; }
+    .example:nth-child(3)       { animation-delay:  90ms; }
+    .example:nth-child(4)       { animation-delay: 135ms; }
+
+    /* ---- Input area ---- */
+    .input-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: white;
+      border: 1.5px solid var(--stone-200);
+      border-radius: var(--radius-lg);
+      padding: 1.125rem;
+      box-shadow: 0 2px 8px oklch(22% 0.008 240 / 0.05);
+      transition: border-color 0.18s ease-out, box-shadow 0.18s ease-out;
+    }
+
+    .input-area:focus-within {
+      border-color: var(--sage-300);
+      box-shadow: 0 0 0 3px oklch(58% 0.105 158 / 0.10), 0 2px 8px oklch(22% 0.008 240 / 0.05);
+    }
+
+    .input-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .input-field-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--stone-500);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .address-input {
+      width: 100%;
+      font-size: 0.9375rem;
+      font-weight: 400;
+      color: var(--stone-900);
+      background: var(--stone-50);
+      border: 1.5px solid var(--stone-200);
+      border-radius: var(--radius-md);
+      padding: 0.625rem 0.875rem;
+      outline: none;
+      line-height: 1.5;
+      transition: border-color 0.15s ease-out;
+    }
+
+    .address-input::placeholder { color: var(--stone-300); }
+    .address-input:focus { border-color: var(--sage-300); }
+
+    .input-divider {
+      height: 1px;
+      background: var(--stone-100);
+    }
+
+    .input-wrap { position: relative; }
+
+    .prompt-input {
+      width: 100%;
+      min-height: 64px;
+      max-height: 180px;
+      resize: none;
+      font-size: 0.9375rem;
+      font-weight: 400;
+      color: var(--stone-900);
+      background: var(--stone-50);
+      border: 1.5px solid var(--stone-200);
+      border-radius: var(--radius-md);
+      padding: 0.625rem 0.875rem;
+      padding-bottom: 0.625rem;
+      outline: none;
+      line-height: 1.55;
+      overflow-y: auto;
+      transition: border-color 0.15s ease-out;
+    }
+
+    .prompt-input::placeholder { color: var(--stone-300); }
+    .prompt-input:focus { border-color: var(--sage-300); }
+
+    .input-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: -0.375rem;
+      padding-top: 0.25rem;
+    }
+
+    .input-hint {
+      font-size: 0.75rem;
+      color: var(--stone-300);
+      text-align: center;
+    }
+
+    .submit-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      font-size: 1.0625rem;
+      font-weight: 600;
+      color: white;
+      background: var(--sage-500);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.5rem;
+      transition: background 0.16s ease-out, transform 0.14s ease-out;
+      letter-spacing: -0.01em;
+    }
+
+    .submit-btn:hover  { background: var(--sage-600); transform: translateY(-1px); }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn svg    { width: 16px; height: 16px; }
+
+    /* ============================================================
+       ANIMATIONS
+    ============================================================ */
+    @keyframes exampleIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       APP STATE
+    ============================================================ */
+    #app {
+      display: none;
+      min-height: 100dvh;
+      flex-direction: column;
+    }
+
+    body.app-mode #landing { display: none; }
+    body.app-mode #app     { display: flex; }
+
+    .app-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.5rem;
+      border-bottom: 1px solid var(--stone-200);
+      background: white;
+      flex-shrink: 0;
+    }
+
+    .app-nav-back {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--stone-600);
+      background: none;
+      border: none;
+      padding: 0.25rem 0;
+      transition: color 0.15s;
+    }
+
+    .app-nav-back:hover { color: var(--stone-900); }
+    .app-nav-back svg   { width: 16px; height: 16px; }
+
+    .app-mode-tag {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--sage-700);
+      background: var(--sage-100);
+      border: 1px solid var(--sage-200);
+      padding: 0.3rem 0.75rem;
+      border-radius: var(--radius-pill);
+    }
+
+    .split {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      overflow: hidden;
+    }
+
+    .chat {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--stone-200);
+      background: white;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .msg { display: flex; flex-direction: column; }
+    .msg-user { align-items: flex-end; }
+
+    .msg-bubble {
+      font-size: 0.9375rem;
+      line-height: 1.55;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      max-width: 88%;
+    }
+
+    .msg-user      .msg-bubble { background: var(--sage-500); color: white; border-bottom-right-radius: 4px; }
+    .msg-assistant .msg-bubble { background: var(--stone-100); color: var(--stone-900); border-bottom-left-radius: 4px; }
+
+    .chat-input-row {
+      display: flex;
+      gap: 0.625rem;
+      align-items: flex-end;
+      padding: 1rem;
+      border-top: 1px solid var(--stone-200);
+    }
+
+    .chat-input {
+      flex: 1;
+      font-size: 0.9375rem;
+      color: var(--stone-900);
+      background: var(--stone-50);
+      border: 1.5px solid var(--stone-200);
+      border-radius: var(--radius-md);
+      padding: 0.625rem 0.875rem;
+      resize: none;
+      outline: none;
+      min-height: 44px;
+      max-height: 120px;
+      line-height: 1.5;
+      transition: border-color 0.16s;
+    }
+
+    .chat-input:focus { border-color: var(--sage-300); }
+
+    .chat-send {
+      width: 40px;
+      height: 40px;
+      background: var(--sage-500);
+      border: none;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .chat-send:hover { background: var(--sage-600); }
+    .chat-send svg   { width: 15px; height: 15px; color: white; }
+
+    .canvas {
+      background: var(--stone-50);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .canvas-empty {
+      text-align: center;
+      max-width: 300px;
+    }
+
+    .canvas-empty-icon {
+      width: 52px;
+      height: 52px;
+      background: var(--stone-100);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+    }
+
+    .canvas-empty h3 {
+      font-family: var(--font-serif);
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--stone-900);
+      margin-bottom: 0.5rem;
+    }
+
+    .canvas-empty p {
+      font-size: 0.9375rem;
+      color: var(--stone-600);
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 680px) {
+      .situation-cards { grid-template-columns: 1fr; }
+      .split           { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     LANDING
+============================================================ -->
+<div id="landing">
+
+  <nav class="nav">
+    <a href="#" class="nav-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <span class="logo-name">Permit Buddy</span>
+    </a>
+    <span class="nav-tag">San Diego</span>
+  </nav>
+
+  <main class="hero">
+    <div class="hero-content">
+
+      <!-- Heading -->
+      <div class="heading-block">
+        <h1 class="headline">San Diego permit guidance for residential projects.</h1>
+        <p class="subheadline">Know what is allowed on your lot, what documents you need, and how your application is moving — in plain English, before delays cost you time and money.</p>
+      </div>
+
+      <!-- Level 1: Situation cards -->
+      <p class="section-label">Where are you with your project?</p>
+      <div class="situation-cards" id="situationCards">
+
+        <button class="situation-card" data-situation="planning" type="button">
+          <span class="situation-label">Just starting to think about it</span>
+          <span class="situation-sub">What's allowed, what it costs</span>
+        </button>
+
+        <button class="situation-card" data-situation="applying" type="button">
+          <span class="situation-label">Ready to apply for a permit</span>
+          <span class="situation-sub">Get the exact checklist</span>
+        </button>
+
+        <button class="situation-card" data-situation="waiting" type="button">
+          <span class="situation-label">Waiting on a permit I filed</span>
+          <span class="situation-sub">Track status or decode a notice</span>
+        </button>
+
+      </div>
+
+      <!-- Level 2: Project type chips (hidden until situation 1 or 2 selected) -->
+      <div class="project-section" id="projectSection" style="display: none;">
+        <span class="category-label" id="projectLabel">What kind of project?</span>
+        <div class="chips" id="chips">
+          <button class="chip" data-cat="adu" type="button">ADU</button>
+          <button class="chip" data-cat="kitchen-bath" type="button">Kitchen or Bath</button>
+          <button class="chip" data-cat="room-addition" type="button">Room Addition</button>
+          <button class="chip" data-cat="solar" type="button">Solar</button>
+          <button class="chip" data-cat="deck-fence" type="button">Deck or Fence</button>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="input-area">
+
+        <!-- Address field -->
+        <div class="input-field-group">
+          <label class="input-field-label" id="addressLabel" for="addressInput">Property address</label>
+          <input
+            id="addressInput"
+            class="address-input"
+            type="text"
+            placeholder="123 Main St, San Diego, CA"
+            autocomplete="street-address"
+          />
+        </div>
+
+        <div class="input-divider"></div>
+
+        <!-- Question field -->
+        <div class="input-field-group">
+          <label class="input-field-label" id="questionLabel" for="promptInput">What do you want to know?</label>
+
+          <div class="input-wrap">
+            <textarea
+              id="promptInput"
+              class="prompt-input"
+              placeholder="Type your question, or pick one below..."
+              rows="2"
+            ></textarea>
+          </div>
+
+          <!-- Suggestions: appear after selecting situation + project type -->
+          <div class="examples-wrap" id="examplesWrap">
+            <div class="examples-inner">
+              <span class="suggestions-label">Not sure where to start? Try one of these:</span>
+              <div class="examples-list" id="examplesList"></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="input-actions">
+        <span class="input-hint">Cmd + Return to submit</span>
+        <button class="submit-btn" id="submitBtn" type="button">
+          <span id="submitLabel">Check what's allowed</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+
+<!-- ============================================================
+     APP STATE
+============================================================ -->
+<div id="app">
+
+  <nav class="app-nav">
+    <button class="app-nav-back" id="backBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"/>
+        <polyline points="12 19 5 12 12 5"/>
+      </svg>
+      Back
+    </button>
+
+    <a href="#" class="nav-logo" style="text-decoration:none; color:inherit;">
+      <div class="logo-mark" style="width:28px; height:28px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:white;">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <span class="logo-name" style="font-size:1rem;">Permit Buddy</span>
+    </a>
+
+    <span class="app-mode-tag" id="appModeTag"></span>
+  </nav>
+
+  <div class="split">
+    <div class="chat">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="Ask a follow-up..." rows="1"></textarea>
+        <button class="chat-send" id="chatSend" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="canvas">
+      <div class="canvas-empty">
+        <div class="canvas-empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(50% 0.014 75)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+        </div>
+        <h3 id="canvasTitle">Your results will appear here</h3>
+        <p id="canvasDesc">Property details, checklists, and cost estimates will appear here as we work through your project together.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+  // ============================================================
+  // DATA
+  // ============================================================
+  var EXAMPLES = {
+    planning: {
+      'adu': [
+        "Can I build a detached ADU on this lot?",
+        "Can I convert my garage into an ADU here?",
+        "What's the max ADU size allowed on this property?",
+        "Do I need a coastal development permit for an ADU at this address?"
+      ],
+      'kitchen-bath': [
+        "Do I need a permit to open up a wall at this address?",
+        "What's involved in adding a full bathroom to this property?",
+        "Which parts of a kitchen remodel need a permit here?"
+      ],
+      'room-addition': [
+        "What are the setback limits for a room addition on this lot?",
+        "Can I add a second story to this property?",
+        "Can I enclose my covered patio and turn it into living space here?"
+      ],
+      'solar': [
+        "Do I need a permit to install solar panels at this address?",
+        "Does adding battery storage to my existing solar need a separate permit?",
+        "How does the streamlined solar permit process work for this property?"
+      ],
+      'deck-fence': [
+        "How high can I build a fence at this address without a permit?",
+        "Do I need a permit to build a deck in my backyard here?",
+        "Does a pergola or covered patio require a permit at this address?"
+      ]
+    },
+    applying: {
+      'adu': [
+        "What do I need to submit to get an ADU permit for this address?",
+        "Do I need a licensed architect, or can I use design-build plans?",
+        "How long is the city's plan check taking for ADUs right now?"
+      ],
+      'kitchen-bath': [
+        "What's on the submittal checklist for a bathroom addition here?",
+        "Does my contractor pull the permit or do I apply myself?",
+        "What inspections will the city require during construction?"
+      ],
+      'room-addition': [
+        "What do I need to submit for a room addition permit at this address?",
+        "Can I start any work while my application is in plan check?",
+        "What's the permit fee for a room addition at this property?"
+      ],
+      'solar': [
+        "What do I need to submit for a solar permit at this address?",
+        "Can my installer handle the permit application, or do I have to?",
+        "How long does a solar permit take to approve for this property?"
+      ],
+      'deck-fence': [
+        "What's on the checklist to permit a deck at this address?",
+        "Do I need a site plan showing property lines to apply?",
+        "What inspections will the city do on the deck after it's built?"
+      ]
+    },
+    waiting: [
+      "My permit says PENDNG-PLANCK — what does that mean?",
+      "I got a correction letter and I don't understand what they're asking for",
+      "It's been 10 weeks since I submitted — is that normal?",
+      "My permit is about to expire — can I get an extension?",
+      "I got a fee invoice and I don't understand the line items"
+    ]
+  };
+
+  var SUBMIT_LABELS = {
+    planning: "Check what's allowed",
+    applying: 'Build my permit checklist',
+    waiting:  'Track my permit status'
+  };
+
+  var ADDRESS_LABELS = {
+    'default':  'Property address',
+    'planning': 'Property address',
+    'applying': 'Property address',
+    'waiting':  'Permit number or property address'
+  };
+
+  var ADDRESS_PLACEHOLDERS = {
+    'default':  '123 Main St, San Diego, CA',
+    'planning': '123 Main St, San Diego, CA',
+    'applying': '123 Main St, San Diego, CA',
+    'waiting':  'PDS2024-xxxxxx or 123 Main St, San Diego, CA'
+  };
+
+  var QUESTION_LABELS = {
+    'default':  'What do you want to know?',
+    'planning': 'What do you want to know about this property?',
+    'applying': 'What are you applying for?',
+    'waiting':  'What are you seeing?'
+  };
+
+  var QUESTION_PLACEHOLDERS = {
+    'default':  'Describe your question or pick one above...',
+    'planning': 'Pick a question above or describe what you want to know...',
+    'applying': 'Pick a question above or describe what you need...',
+    'waiting':  'Pick a situation above or describe what you\'re seeing...'
+  };
+
+  var FIRST_MESSAGES = {
+    planning: "Got it. Let me pull up what San Diego's zoning rules say for your area. What's the address for the property?",
+    applying: "Sure, let's get your checklist together. First — what's the address for the project?",
+    waiting:  "I'll look that up. What's your permit number? Or if you don't have it handy, give me the address and we'll find it."
+  };
+
+  var MODE_TAGS = {
+    planning: "What's allowed",
+    applying: 'Permit checklist',
+    waiting:  'Permit tracker'
+  };
+
+  var CANVAS_CONTENT = {
+    planning: {
+      title: 'Zoning rules for your property',
+      desc:  "What your lot allows, setback requirements, and what permits you'll need will show up here."
+    },
+    applying: {
+      title: 'Your permit checklist',
+      desc:  'Exactly what to submit, who reviews it, how long it takes, and what it costs.'
+    },
+    waiting: {
+      title: 'Your permit status',
+      desc:  'Current status, what each stage means, and what your next move is.'
+    }
+  };
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  var activeSituation = null;
+  var activeCategory  = null;
+
+  // ============================================================
+  // SITUATION CARDS (Level 1)
+  // ============================================================
+  document.getElementById('situationCards').addEventListener('click', function(e) {
+    var card = e.target.closest('.situation-card');
+    if (!card) return;
+
+    var situation = card.dataset.situation;
+
+    if (activeSituation === situation) {
+      activeSituation = null;
+      card.classList.remove('active');
+      hideProjectChips();
+      closeExamples();
+      resetSubmitLabel();
+      resetFieldLabels();
+      return;
+    }
+
+    document.querySelectorAll('.situation-card').forEach(function(c) { c.classList.remove('active'); });
+    card.classList.add('active');
+    activeSituation = situation;
+    activeCategory  = null;
+    document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+
+    updateSubmitLabel(situation);
+    updateFieldLabels(situation);
+
+    if (situation === 'waiting') {
+      hideProjectChips();
+      openExamples(EXAMPLES.waiting);
+    } else {
+      showProjectChips(situation);
+      closeExamples();
+    }
+  });
+
+  function showProjectChips(situation) {
+    var section = document.getElementById('projectSection');
+    var label   = document.getElementById('projectLabel');
+    label.textContent = situation === 'applying' ? 'What are you applying for?' : 'What kind of project?';
+    section.style.display = 'flex';
+  }
+
+  function hideProjectChips() {
+    document.getElementById('projectSection').style.display = 'none';
+  }
+
+  // ============================================================
+  // PROJECT CHIPS (Level 2)
+  // ============================================================
+  document.getElementById('chips').addEventListener('click', function(e) {
+    var chip = e.target.closest('.chip');
+    if (!chip || !activeSituation) return;
+
+    var cat = chip.dataset.cat;
+
+    if (activeCategory === cat) {
+      activeCategory = null;
+      chip.classList.remove('active');
+      closeExamples();
+      return;
+    }
+
+    document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+    chip.classList.add('active');
+    activeCategory = cat;
+
+    var prompts = EXAMPLES[activeSituation] && EXAMPLES[activeSituation][cat];
+    if (prompts) openExamples(prompts);
+  });
+
+  // ============================================================
+  // EXAMPLES
+  // ============================================================
+  function openExamples(prompts) {
+    var list = document.getElementById('examplesList');
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+
+    prompts.forEach(function(text) {
+      var btn = document.createElement('button');
+      btn.className = 'example';
+      btn.type = 'button';
+      btn.textContent = text;
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.example').forEach(function(e) { e.classList.remove('selected'); });
+        btn.classList.add('selected');
+        fillPrompt(text);
+      });
+      list.appendChild(btn);
+    });
+
+    document.getElementById('examplesWrap').classList.add('open');
+  }
+
+  function closeExamples() {
+    document.getElementById('examplesWrap').classList.remove('open');
+  }
+
+  function fillPrompt(text) {
+    var input = document.getElementById('promptInput');
+    input.value = text;
+    autoResize(input);
+    // Focus address if empty, otherwise focus question field
+    var address = document.getElementById('addressInput');
+    if (!address.value.trim()) {
+      address.focus();
+    } else {
+      input.focus();
+      input.setSelectionRange(text.length, text.length);
+    }
+  }
+
+  // ============================================================
+  // SUBMIT LABEL + PLACEHOLDER
+  // ============================================================
+  function updateSubmitLabel(situation) {
+    document.getElementById('submitLabel').textContent = SUBMIT_LABELS[situation] || 'Get started';
+  }
+
+  function resetSubmitLabel() {
+    document.getElementById('submitLabel').textContent = "Check what's allowed";
+  }
+
+  function updateFieldLabels(situation) {
+    var s = situation || 'default';
+    document.getElementById('addressLabel').textContent    = ADDRESS_LABELS[s]        || ADDRESS_LABELS['default'];
+    document.getElementById('addressInput').placeholder    = ADDRESS_PLACEHOLDERS[s]  || ADDRESS_PLACEHOLDERS['default'];
+    document.getElementById('questionLabel').textContent   = QUESTION_LABELS[s]       || QUESTION_LABELS['default'];
+    document.getElementById('promptInput').placeholder     = QUESTION_PLACEHOLDERS[s] || QUESTION_PLACEHOLDERS['default'];
+  }
+
+  function resetFieldLabels() {
+    updateFieldLabels('default');
+  }
+
+  // ============================================================
+  // AUTO-RESIZE TEXTAREA
+  // ============================================================
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+  }
+
+  document.getElementById('promptInput').addEventListener('input', function(e) { autoResize(e.target); });
+  document.getElementById('chatInput').addEventListener('input', function(e) { autoResize(e.target); });
+
+  // ============================================================
+  // SUBMIT
+  // ============================================================
+  document.getElementById('submitBtn').addEventListener('click', submit);
+
+  document.getElementById('promptInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { submit(); }
+  });
+
+  document.getElementById('addressInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { document.getElementById('promptInput').focus(); }
+  });
+
+  function submit() {
+    var address  = document.getElementById('addressInput').value.trim();
+    var question = document.getElementById('promptInput').value.trim();
+    if (!address && !question) return;
+
+    var situation = activeSituation || 'planning';
+
+    document.getElementById('appModeTag').textContent = MODE_TAGS[situation] || '';
+
+    var content = CANVAS_CONTENT[situation];
+    if (content) {
+      document.getElementById('canvasTitle').textContent = content.title;
+      document.getElementById('canvasDesc').textContent  = content.desc;
+    }
+
+    var userMsg = address && question
+      ? address + ' — ' + question
+      : address || question;
+
+    addMessage(userMsg, 'user');
+    addMessage(FIRST_MESSAGES[situation] || "Got it — pulling data for that address now.", 'assistant');
+
+    document.body.classList.add('app-mode');
+    document.getElementById('chatInput').focus();
+  }
+
+  // ============================================================
+  // BACK
+  // ============================================================
+  document.getElementById('backBtn').addEventListener('click', function() {
+    document.body.classList.remove('app-mode');
+    var feed = document.getElementById('chatMessages');
+    while (feed.firstChild) { feed.removeChild(feed.firstChild); }
+  });
+
+  // ============================================================
+  // CHAT
+  // ============================================================
+  function addMessage(text, role) {
+    var feed   = document.getElementById('chatMessages');
+    var msg    = document.createElement('div');
+    msg.className = 'msg msg-' + role;
+
+    var bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = text;
+
+    msg.appendChild(bubble);
+    feed.appendChild(msg);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  document.getElementById('chatSend').addEventListener('click', sendChat);
+
+  document.getElementById('chatInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+
+  function sendChat() {
+    var input = document.getElementById('chatInput');
+    var text  = input.value.trim();
+    if (!text) return;
+    addMessage(text, 'user');
+    input.value = '';
+    autoResize(input);
+  }
+</script>
+
+</body>
+</html>
