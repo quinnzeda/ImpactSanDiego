@@ -97,9 +97,9 @@ export function OptionsExplorer({ options, reliability, onSelect }: Props) {
                     <div className="text-[1rem] font-bold text-stone-900 leading-[1.3] mb-1">{t.label}</div>
                     <div className="text-[0.8125rem] text-stone-500 leading-[1.5] mb-2.5">{t.description}</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {[meta.size, meta.cost, meta.timeline].map((tag) => (
+                      {[meta.size, meta.cost, meta.timeline].map((tag, i) => (
                         <span
-                          key={tag}
+                          key={i}
                           className="text-[0.6875rem] font-semibold text-stone-600 bg-white border border-stone-200 px-2.5 py-1 rounded-[6px]"
                         >
                           {tag}

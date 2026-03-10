@@ -703,14 +703,7 @@ function CanvasRouter({
       primaryCard = <PermitRoadmap data={result} projectDescription={projectDescription} />;
   }
 
-  return (
-    <>
-      {hasProperty && (
-        <PropertyCard property={propertySource} />
-      )}
-      {primaryCard}
-    </>
-  );
+  return <>{primaryCard}</>;
 }
 
 // ── Small components ──────────────────────────────────────────────────────────
