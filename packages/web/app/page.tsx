@@ -83,6 +83,32 @@ const CANVAS_CONTENT: Record<Situation, { title: string; desc: string }> = {
   waiting:  { title: "Your permit status",              desc: "Current status, what each stage means, and what your next move is." },
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function buildPropertySummary(data: Record<string, unknown>): string {
+  const addr = (data.address as string)?.split(",")[0] || "your property";
+  const community = data.community_plan_area as string | undefined;
+  const zone = data.zone_code as string | undefined;
+  const lot = data.lot_size_sqft as number | undefined;
+  const isCoastal = data.is_coastal as boolean;
+  const isHistoric = data.is_historic as boolean;
+  const yearBuilt = data.year_built as number | undefined;
+
+  let msg = `Found it! ${addr}`;
+  if (community) msg += ` in ${community}`;
+  msg += ".";
+
+  const highlights: string[] = [];
+  if (zone) highlights.push(`zoned ${zone}`);
+  if (lot) highlights.push(`${lot.toLocaleString()} sq ft lot`);
+  if (isCoastal) highlights.push("in the Coastal Zone");
+  if (isHistoric || (yearBuilt && yearBuilt <= new Date().getFullYear() - 45))
+    highlights.push(`built in ${yearBuilt} (may trigger historic review)`);
+
+  if (highlights.length) msg += ` Key details: ${highlights.join(", ")}.`;
+  return msg;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -189,7 +215,16 @@ export default function Home() {
       const propertyPromise = address.trim()
         ? fetch(`/api/property-lookup?address=${encodeURIComponent(address)}`)
             .then((r) => r.ok ? r.json() : null)
-            .then((data) => { if (data) setPropertyData(data); return data; })
+            .then((data) => {
+              if (data) {
+                setPropertyData(data);
+                const summary = buildPropertySummary(data);
+                if (summary) {
+                  setMessages((prev) => [...prev, { role: "assistant", content: summary }]);
+                }
+              }
+              return data;
+            })
             .catch(() => null)
         : Promise.resolve(null);
 
@@ -226,7 +261,6 @@ export default function Home() {
 
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
-    setResult(null);
 
     try {
       const res = await fetch("/api/navigate", {
@@ -643,12 +677,21 @@ function CanvasRouter({
   switch (effectiveCanvas) {
     case "verdict":
       primaryCard = (
-        <PermitVerdictCard
-          verdict={result.verdict as Record<string, unknown> | undefined}
-          estimated_timeline={result.estimated_timeline as string | undefined}
-          estimated_cost_range={result.estimated_cost_range as string | undefined}
-          reliability={reliability}
-        />
+        <>
+          <PermitVerdictCard
+            verdict={result.verdict as Record<string, unknown> | undefined}
+            estimated_timeline={result.estimated_timeline as string | undefined}
+            estimated_cost_range={result.estimated_cost_range as string | undefined}
+            reliability={reliability}
+          />
+          {result.options && (
+            <OptionsExplorer
+              options={result.options as Record<string, unknown> | undefined}
+              reliability={reliability}
+              onSelect={onSelect}
+            />
+          )}
+        </>
       );
       break;
     case "checklist":

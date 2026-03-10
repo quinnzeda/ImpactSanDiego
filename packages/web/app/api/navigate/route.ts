@@ -103,7 +103,7 @@ function selectCanvas(
 
   if (situation === "waiting") return "status";
   if (situation === "applying") return "checklist";
-  if (situation === "planning" && isAduOptionsIntent) return "options";
+  // ADU planning always shows verdict first (with options embedded for ADU category)
   if (situation === "planning") return "verdict";
   return "roadmap";
 }
@@ -247,16 +247,16 @@ export async function POST(request: NextRequest) {
       const coreFields = `"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"..."}],"process_steps":["step 1","step 2"],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."]`;
       const verdictField = `"verdict":{"level":"green|amber|red","headline":"one sentence","reason":"2-3 sentences","what_changes_everything":"key factor"}`;
       const phasesField = canvasType === "checklist"
-        ? `,"phases":[{"label":"phase name with timing e.g. Do this now · Free · 1–2 weeks","color":"green|violet|blue|gray","steps":[{"title":"step title","subtitle":"brief timing or context","detail":"optional 1-2 sentence explanation"}]}]`
+        ? `,"phases":[{"label":"phase name with timing and cost e.g. 'Preparation · Do this now · Free · 1–2 weeks'","color":"green|violet|blue|gray","steps":[{"title":"specific action","subtitle":"time estimate e.g. '30 minutes' or '5–7 day wait'","detail":"1-2 sentences: WHY this matters for THIS property. Include property-specific notes (coastal zone → submit coastal + building permits together; historic → photograph all 4 sides; year built triggers historic review). Include URLs: OpenDSD portal (https://aca-prod.accela.com/SANDIEGO/Default.aspx), Assessor records (https://arcc-public.sandiegocounty.gov/), DSD office 1222 First Ave."}]}]`
         : "";
-      const optionsField = canvasType === "options"
+      const optionsField = (canvasType === "options" || (canvasType === "verdict" && category === "adu"))
         ? `,"options":{"adu_types":[{"id":"detached|attached|garage|jadu|conversion","label":"...","description":"one sentence","pros":["..."],"cons":["..."]}],"default_type":"...","size_range":{"min":150,"max":1200,"default":600}}`
         : "";
       const checklistField = canvasType === "checklist"
         ? `,"checklist":{"items":[{"id":"c1","label":"document or task name","description":"why it's needed","required":true,"category":"documents|plans|fees|inspections"}]}`
         : "";
 
-      const needsLargeResponse = canvasType === "checklist" || canvasType === "options";
+      const needsLargeResponse = canvasType === "checklist" || canvasType === "options" || (canvasType === "verdict" && category === "adu");
       const response = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: needsLargeResponse ? 4000 : 2000,
@@ -278,8 +278,9 @@ export async function POST(request: NextRequest) {
           if (!parsed.canvas) parsed.canvas = canvasType;
           if (!parsed.reliability)
             parsed.reliability = { source: "ai", notes: ["AI-generated guidance"] };
-          // Ensure ADU options are populated when canvas is "options"
-          if (parsed.canvas === "options" && (!parsed.options?.adu_types || parsed.options.adu_types.length === 0)) {
+          // Ensure ADU options are populated when canvas is "options" or verdict+adu
+          if ((parsed.canvas === "options" || (parsed.canvas === "verdict" && category === "adu")) &&
+              (!parsed.options?.adu_types || parsed.options.adu_types.length === 0)) {
             parsed.options = getDefaultAduOptions(propertyData);
           }
           // Ensure checklist items are populated when canvas is "checklist"
@@ -546,6 +547,8 @@ function getFallbackNavigation(
             "Coastal overlay, hillside designation, or historic district could add requirements. Address-specific zoning verification is recommended.",
         };
       }
+      // Also include options so verdict + options render together for ADU
+      result.options = getDefaultAduOptions(property);
     } else if (canvas === "checklist") {
       result.checklist = {
         items: [
