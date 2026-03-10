@@ -246,18 +246,25 @@ export async function POST(request: NextRequest) {
       // Build a focused prompt based on canvas type — avoid requesting ALL fields
       const coreFields = `"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"..."}],"process_steps":["step 1","step 2"],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."]`;
       const verdictField = `"verdict":{"level":"green|amber|red","headline":"one sentence","reason":"2-3 sentences","what_changes_everything":"key factor"}`;
+      const phasesField = canvasType === "checklist"
+        ? `,"phases":[{"label":"phase name with timing e.g. Do this now · Free · 1–2 weeks","color":"green|violet|blue|gray","steps":[{"title":"step title","subtitle":"brief timing or context","detail":"optional 1-2 sentence explanation"}]}]`
+        : "";
       const optionsField = canvasType === "options"
         ? `,"options":{"adu_types":[{"id":"detached|attached|garage|jadu|conversion","label":"...","description":"one sentence","pros":["..."],"cons":["..."]}],"default_type":"...","size_range":{"min":150,"max":1200,"default":600}}`
         : "";
+      const checklistField = canvasType === "checklist"
+        ? `,"checklist":{"items":[{"id":"c1","label":"document or task name","description":"why it's needed","required":true,"category":"documents|plans|fees|inspections"}]}`
+        : "";
 
+      const needsLargeResponse = canvasType === "checklist" || canvasType === "options";
       const response = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: canvasType === "options" ? 2500 : 1500,
+        max_tokens: needsLargeResponse ? 4000 : 2000,
         system: systemPrompt,
         messages: [
           {
             role: "user",
-            content: `Provide a concise San Diego permit roadmap.\n\n${userMsg}\n\nRespond ONLY with valid JSON:\n{${coreFields},${verdictField}${optionsField},"canvas":"${canvasType}"}`,
+            content: `Provide a concise San Diego permit roadmap.\n\n${userMsg}\n\nRespond ONLY with valid JSON:\n{${coreFields},${verdictField}${phasesField}${optionsField}${checklistField},"canvas":"${canvasType}"}`,
           },
         ],
       });
@@ -274,6 +281,14 @@ export async function POST(request: NextRequest) {
           // Ensure ADU options are populated when canvas is "options"
           if (parsed.canvas === "options" && (!parsed.options?.adu_types || parsed.options.adu_types.length === 0)) {
             parsed.options = getDefaultAduOptions(propertyData);
+          }
+          // Ensure checklist items are populated when canvas is "checklist"
+          if (parsed.canvas === "checklist" && (!parsed.checklist?.items || parsed.checklist.items.length === 0)) {
+            const fallback = getFallbackNavigation(project_description, answers, situation, category, propertyData) as Record<string, unknown>;
+            const fallbackChecklist = fallback["checklist"] as { items?: unknown[] } | undefined;
+            if (fallbackChecklist?.items) {
+              parsed.checklist = fallbackChecklist;
+            }
           }
           // Merge real property data over AI-guessed property fields
           if (propertyData && propertyData.data_sources.length > 0) {

@@ -95,7 +95,7 @@ export function PersonalizedChecklist({ checklist, reliability, projectDescripti
 
         {items.length === 0 ? (
           <p className="text-[0.9375rem] text-stone-400 italic py-4 text-center">
-            No checklist items available — set ANTHROPIC_API_KEY for a personalized list.
+            No checklist items available yet. Try describing your project to get a personalized list.
           </p>
         ) : (
           <div className="flex flex-col gap-5">

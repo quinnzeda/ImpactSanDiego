@@ -7,6 +7,8 @@ import { PersonalizedChecklist } from "./components/PersonalizedChecklist";
 import { StatusTracker } from "./components/StatusTracker";
 import { PropertyCard } from "./components/PropertyCard";
 import { OptionsExplorer } from "./components/OptionsExplorer";
+import { CostCalculator } from "./components/CostCalculator";
+import { PermitPlan } from "./components/PermitPlan";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -101,6 +103,7 @@ export default function Home() {
   const [result,     setResult]     = useState<Record<string, unknown> | null>(null);
   const [propertyData, setPropertyData] = useState<Record<string, unknown> | null>(null);
   const [chatInput,  setChatInput]  = useState("");
+  const [selectedAdu, setSelectedAdu] = useState<{ typeId: string; label: string } | null>(null);
 
   const promptRef      = useRef<HTMLTextAreaElement>(null);
   const chatInputRef   = useRef<HTMLTextAreaElement>(null);
@@ -247,9 +250,18 @@ export default function Home() {
     }
   }
 
+  function handleOptionSelect(typeId: string, label: string) {
+    setSelectedAdu({ typeId, label });
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Let's go with the ${label} option.` },
+      { role: "assistant", content: "Great choice. Now let's figure out your costs. I've set up a calculator on the right — drag the size slider to see how the square footage affects your permit fees, construction costs, and timeline." },
+    ]);
+    setResult({ canvas: "calculator" });
+  }
+
   async function handleGetPlan(selectedType: string, size: number) {
     setLoading(true);
-    setResult(null);
     setMessages((prev) => [...prev, { role: "assistant", content: "Building your step-by-step permit plan..." }]);
     try {
       const res = await fetch("/api/navigate", {
@@ -263,7 +275,8 @@ export default function Home() {
         }),
       });
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: "Here's your complete permit plan." }]);
+      data.canvas = "plan";
+      setMessages((prev) => [...prev, { role: "assistant", content: "Here's your complete step-by-step plan! Click any step to expand the details." }]);
       setResult(data);
     } catch (err) {
       console.error(err);
@@ -278,6 +291,7 @@ export default function Home() {
     setMessages([]);
     setResult(null);
     setPropertyData(null);
+    setSelectedAdu(null);
     setLoading(false);
   }
 
@@ -502,6 +516,13 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+                {loading && (
+                  <div className="flex flex-col items-start">
+                    <div className="bg-stone-100 text-stone-400 px-4 py-3 rounded-[14px] rounded-bl-[4px] text-[0.9375rem]">
+                      Thinking…
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -554,7 +575,9 @@ export default function Home() {
                     activeSituation={activeSituation}
                     projectDescription={promptValue || address}
                     address={address}
+                    onSelect={handleOptionSelect}
                     onGetPlan={handleGetPlan}
+                    selectedAdu={selectedAdu}
                     earlyPropertyData={propertyData}
                   />
                 </div>
@@ -582,14 +605,18 @@ function CanvasRouter({
   activeSituation,
   projectDescription,
   address,
+  onSelect,
   onGetPlan,
+  selectedAdu,
   earlyPropertyData,
 }: {
   result: Record<string, unknown>;
   activeSituation: Situation | null;
   projectDescription: string;
   address: string;
+  onSelect?: (typeId: string, label: string) => void;
   onGetPlan?: (selectedType: string, size: number) => void;
+  selectedAdu?: { typeId: string; label: string } | null;
   earlyPropertyData?: Record<string, unknown> | null;
 }) {
   const canvas = result.canvas as string | undefined;
@@ -647,8 +674,28 @@ function CanvasRouter({
         <OptionsExplorer
           options={result.options as Record<string, unknown> | undefined}
           reliability={reliability}
+          onSelect={onSelect}
+        />
+      );
+      break;
+    case "calculator":
+      primaryCard = selectedAdu && onGetPlan ? (
+        <CostCalculator
+          selectedType={selectedAdu.typeId}
+          selectedLabel={selectedAdu.label}
           property={propertySource}
           onGetPlan={onGetPlan}
+        />
+      ) : null;
+      break;
+    case "plan":
+      primaryCard = (
+        <PermitPlan
+          phases={result.phases as Array<{ label: string; color: "green" | "violet" | "blue" | "gray"; steps: Array<{ title: string; subtitle?: string; detail?: string }> }> | undefined}
+          process_steps={result.process_steps as string[] | undefined}
+          checklist={result.checklist as Record<string, unknown> | undefined}
+          estimated_timeline={result.estimated_timeline as string | undefined}
+          estimated_cost_range={result.estimated_cost_range as string | undefined}
         />
       );
       break;
