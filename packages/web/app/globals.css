@@ -142,10 +142,10 @@ body {
 /* Thinking dots (chat bubble) */
 .thinking-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #a8a29e; /* stone-400 */
+  background: var(--sage-500);
   animation: pulse-dot 1.4s infinite ease-in-out both;
 }
 .thinking-dot:nth-child(1) { animation-delay: -0.32s; }

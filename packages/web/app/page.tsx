@@ -142,7 +142,7 @@ export default function Home() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   // ── Landing interactions ───────────────────────────────────────────────────
 
@@ -294,7 +294,7 @@ export default function Home() {
     setResult({ canvas: "calculator" });
   }
 
-  async function handleGetPlan(selectedType: string, size: number) {
+  async function handleGetPlan(selectedType: string, size: number, costs?: { permitFees: string; timeline: string }) {
     setLoading(true);
     setMessages((prev) => [...prev, { role: "assistant", content: "Building your step-by-step permit plan..." }]);
     try {
@@ -310,6 +310,10 @@ export default function Home() {
       });
       const data = await res.json();
       data.canvas = "plan";
+      if (costs) {
+        data.estimated_cost_range = costs.permitFees;
+        data.estimated_timeline = costs.timeline;
+      }
       setMessages((prev) => [...prev, { role: "assistant", content: "Here's your complete step-by-step plan! Click any step to expand the details." }]);
       setResult(data);
     } catch (err) {
@@ -552,10 +556,13 @@ export default function Home() {
                 ))}
                 {loading && (
                   <div className="flex flex-col items-start animate-fade-in">
-                    <div className="bg-stone-100 px-4 py-3.5 rounded-[14px] rounded-bl-[4px] flex items-center gap-[5px]">
-                      <span className="thinking-dot" />
-                      <span className="thinking-dot" />
-                      <span className="thinking-dot" />
+                    <div className="bg-stone-100 px-4 py-3 rounded-[14px] rounded-bl-[4px] flex items-center gap-2">
+                      <div className="flex items-center gap-[5px]">
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
+                      </div>
+                      <span className="text-[0.8125rem] text-stone-400 font-medium">Thinking</span>
                     </div>
                   </div>
                 )}
@@ -605,7 +612,7 @@ export default function Home() {
                 </div>
               )}
               {result && (
-                <div className="p-6 flex flex-col gap-4">
+                <div className="p-6 flex flex-col gap-4 relative">
                   <CanvasRouter
                     result={result}
                     activeSituation={activeSituation}
@@ -616,6 +623,18 @@ export default function Home() {
                     selectedAdu={selectedAdu}
                     earlyPropertyData={propertyData}
                   />
+                  {loading && (
+                    <div className="absolute inset-0 bg-stone-50/60 flex items-start justify-center pt-12 animate-fade-in">
+                      <div className="flex items-center gap-2.5 bg-white px-4 py-2.5 rounded-full shadow-sm border border-stone-200">
+                        <div className="flex items-center gap-[4px]">
+                          <span className="thinking-dot" />
+                          <span className="thinking-dot" />
+                          <span className="thinking-dot" />
+                        </div>
+                        <span className="text-[0.8125rem] text-stone-600 font-medium">Updating...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {!loading && !result && !propertyData && (
@@ -651,7 +670,7 @@ function CanvasRouter({
   projectDescription: string;
   address: string;
   onSelect?: (typeId: string, label: string) => void;
-  onGetPlan?: (selectedType: string, size: number) => void;
+  onGetPlan?: (selectedType: string, size: number, costs: { permitFees: string; timeline: string }) => void;
   selectedAdu?: { typeId: string; label: string } | null;
   earlyPropertyData?: Record<string, unknown> | null;
 }) {
