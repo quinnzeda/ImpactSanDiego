@@ -314,6 +314,12 @@ export default function Home() {
         data.estimated_cost_range = costs.permitFees;
         data.estimated_timeline = costs.timeline;
       }
+      data.projectContext = {
+        address: address || undefined,
+        neighborhood: (data.property as Record<string, unknown> | undefined)?.community_plan_area as string | undefined,
+        type: selectedAdu?.label || selectedType,
+        size,
+      };
       setMessages((prev) => [...prev, { role: "assistant", content: "Here's your complete step-by-step plan! Click any step to expand the details." }]);
       setResult(data);
     } catch (err) {
@@ -755,11 +761,12 @@ function CanvasRouter({
     case "plan":
       primaryCard = (
         <PermitPlan
-          phases={result.phases as Array<{ label: string; color: "green" | "violet" | "blue" | "gray"; steps: Array<{ title: string; subtitle?: string; detail?: string }> }> | undefined}
+          phases={result.phases as Array<{ label: string; color: "green" | "violet" | "blue" | "gray"; steps: Array<{ title: string; subtitle?: string; detail?: string; warning?: string; tip?: string; link?: { label: string; url: string } }> }> | undefined}
           process_steps={result.process_steps as string[] | undefined}
           checklist={result.checklist as Record<string, unknown> | undefined}
           estimated_timeline={result.estimated_timeline as string | undefined}
           estimated_cost_range={result.estimated_cost_range as string | undefined}
+          projectContext={result.projectContext as { address?: string; neighborhood?: string; type?: string; size?: number } | undefined}
         />
       );
       break;

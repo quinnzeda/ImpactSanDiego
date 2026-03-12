@@ -167,6 +167,7 @@ export async function POST(request: NextRequest) {
           if (propertyData.is_coastal) userMsg += `\n- In Coastal Zone: YES`;
           if (propertyData.is_historic) userMsg += `\n- In Historic District: YES`;
           if (propertyData.overlays.length > 0) userMsg += `\n- Overlays: ${propertyData.overlays.join(", ")}`;
+          if (propertyData.allowed_units_description) userMsg += `\n- Allowed units: ${propertyData.allowed_units_description}`;
           if (propertyData.past_permits.length > 0) {
             userMsg += `\n- Past permits: ${propertyData.past_permits.map((p) => `${p.type} (${p.year ?? "?"}, ${p.status})`).join(", ")}`;
           }
@@ -238,6 +239,7 @@ export async function POST(request: NextRequest) {
         userMsg += `\n- In Coastal Zone: ${propertyData.is_coastal ? "YES" : "NO"}`;
         userMsg += `\n- In Historic District: ${propertyData.is_historic ? "YES" : "NO"}`;
         if (propertyData.overlays.length > 0) userMsg += `\n- Special overlays: ${propertyData.overlays.join(", ")}`;
+        if (propertyData.allowed_units_description) userMsg += `\n- Allowed units: ${propertyData.allowed_units_description}`;
         if (propertyData.past_permits.length > 0) {
           userMsg += `\n- Past permits: ${propertyData.past_permits.map((p) => `${p.type} (${p.year ?? "?"}, ${p.status})`).join("; ")}`;
         }
@@ -247,7 +249,31 @@ export async function POST(request: NextRequest) {
       const coreFields = `"permits_needed":[{"type":"...","name":"...","reason":"..."}],"exemptions":[{"item":"...","code_section":"..."}],"forms_required":[{"form_id":"...","name":"..."}],"process_steps":["step 1","step 2"],"estimated_timeline":"...","estimated_cost_range":"...","tips":["..."]`;
       const verdictField = `"verdict":{"level":"green|amber|red","headline":"one sentence","reason":"2-3 sentences","what_changes_everything":"key factor"}`;
       const phasesField = canvasType === "checklist"
-        ? `,"phases":[{"label":"phase name with timing and cost e.g. 'Preparation · Do this now · Free · 1–2 weeks'","color":"green|violet|blue|gray","steps":[{"title":"specific action","subtitle":"time estimate e.g. '30 minutes' or '5–7 day wait'","detail":"1-2 sentences: WHY this matters for THIS property. Include property-specific notes (coastal zone → submit coastal + building permits together; historic → photograph all 4 sides; year built triggers historic review). Include URLs: OpenDSD portal (https://aca-prod.accela.com/SANDIEGO/Default.aspx), Assessor records (https://arcc-public.sandiegocounty.gov/), DSD office 1222 First Ave."}]}]`
+        ? `,"phases": EXACTLY 4 phases in this order. Adapt step details based on property data (coastal, historic, setbacks, year built). Each step has: title, subtitle, detail (1-2 sentences), and OPTIONAL warning/tip/link. Use ONLY these real URLs for links:
+- OpenDSD permit portal: https://aca-prod.accela.com/SANDIEGO/Default.aspx
+- Assessor records: https://arcc-public.sandiegocounty.gov/
+- Pre-approved ADU plans: https://www.sandiegocounty.gov/pds/bldg/adu_plans.html
+- DSD forms/info: https://www.sandiego.gov/development-services
+
+STRUCTURE (follow exactly):
+[
+  {"label":"Do this now · Free · 1–2 weeks","color":"green","steps":[
+    (if historic/pre-1978: {"title":"Photograph your existing home","subtitle":"All four sides in daylight — 30 minutes","detail":"Your home was built in [year], so any permit triggers a historic review. The city needs photos of your house as it exists now. Shoot all four sides straight-on, any original features, your backyard, any detached structures.","tip":"Shoot on a clear day, no cars blocking the view, full facade in each shot."}),
+    (if historic: {"title":"Request your Assessor Building Record","subtitle":"5 min online, then 5–7 day wait","detail":"The city needs this document to complete the historic review. Request it now while you work on other steps.","link":{"label":"Request your record","url":"https://arcc-public.sandiegocounty.gov/"}}),
+    {"title":"Download and review application forms","subtitle":"5 minutes","detail":"You need three forms: DS-345 (Building Permit Application), DS-530 (ADU Supplemental Application), and DS-560 (Plan Submittal Requirements). Review them so you know what your architect needs to include.","link":{"label":"Go to DSD forms","url":"https://www.sandiego.gov/development-services"}}
+  ]},
+  {"label":"Hire professionals · 2–4 weeks · $5k–15k","color":"violet","steps":[
+    {"title":"Hire an architect and get plans drawn","subtitle":"Or use free pre-approved county plans","detail":"Your architect produces the complete plan set: site plan, floor plan, elevations, structural calcs, Title 24 energy calcs, and stormwater checklist. [If setbacks known, add: Your setbacks: Xft from street · Xft from neighbors · Xft from back.]","warning":"40% of ADU permits in San Diego get sent back for missing Title 24 energy calcs. Make sure they are included in the first submittal.","tip":"County offers free pre-approved ADU plans that can save $5k–$15k in architect fees.","link":{"label":"Browse pre-approved plans","url":"https://www.sandiegocounty.gov/pds/bldg/adu_plans.html"}}
+  ]},
+  {"label":"Submit everything","color":"blue","steps":[
+    (if coastal: {"title":"Submit building + coastal permits together","subtitle":"Through the OpenDSD portal","detail":"Submit both permits at the same time. If you do the building permit first, the coastal review becomes a bottleneck.","link":{"label":"Go to permit portal","url":"https://aca-prod.accela.com/SANDIEGO/Default.aspx"}}
+     else: {"title":"Submit your permit application","subtitle":"Through the OpenDSD portal","detail":"Submit DS-345, DS-530, and your complete plan set. The city has 60 days to review ADU applications by state law.","link":{"label":"Go to permit portal","url":"https://aca-prod.accela.com/SANDIEGO/Default.aspx"}}),
+    {"title":"Pay plan check fees when invoiced","subtitle":"Review doesn't start until you pay"}
+  ]},
+  {"label":"Wait & respond","color":"gray","steps":[
+    {"title":"Plan review + corrections","subtitle":"60–90 days first review, then 2–3 rounds of corrections"}
+  ]}
+]`
         : "";
       const optionsField = (canvasType === "options" || (canvasType === "verdict" && category === "adu"))
         ? `,"options":{"adu_types":[{"id":"detached|attached|garage|jadu|conversion","label":"...","description":"one sentence","pros":["..."],"cons":["..."]}],"default_type":"...","size_range":{"min":150,"max":1200,"default":600}}`
@@ -258,7 +284,7 @@ export async function POST(request: NextRequest) {
 
       const needsLargeResponse = canvasType === "checklist" || canvasType === "options" || (canvasType === "verdict" && category === "adu");
       const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-sonnet-4-6",
         max_tokens: needsLargeResponse ? 4000 : 2000,
         system: systemPrompt,
         messages: [
@@ -355,9 +381,109 @@ function mergePropertyData(
   };
 }
 
+interface FallbackStep {
+  title: string;
+  subtitle?: string;
+  detail?: string;
+  warning?: string;
+  tip?: string;
+  link?: { label: string; url: string };
+}
+
+function buildAduFallbackPhases(property?: PropertyLookupData | null) {
+  const isCoastal = property?.is_coastal ?? false;
+  const isHistoric = property?.is_historic ?? false;
+  const yearBuilt = property?.year_built;
+  const needsHistoricSteps = isHistoric || (yearBuilt != null && yearBuilt < 1978);
+
+  const front = property?.front_setback_ft;
+  const side = property?.side_setback_ft;
+  const rear = property?.rear_setback_ft;
+  const hasSetbacks = front != null || side != null || rear != null;
+
+  // Phase 1: Do this now
+  const phase1Steps: FallbackStep[] = [];
+  if (needsHistoricSteps) {
+    phase1Steps.push({
+      title: "Photograph your existing home",
+      subtitle: "All four sides in daylight — 30 minutes",
+      detail: yearBuilt
+        ? `Your home was built in ${yearBuilt}, so any permit triggers a historic review. The city needs photos of your house as it exists now. Shoot all four sides straight-on, any original features, your backyard, and any detached structures.`
+        : "Your property may trigger a historic review. The city needs photos of your house as it exists now. Shoot all four sides straight-on, any original features, your backyard, and any detached structures.",
+      tip: "Shoot on a clear day, no cars blocking the view, full facade in each shot.",
+    });
+    phase1Steps.push({
+      title: "Request your Assessor Building Record",
+      subtitle: "5 min online, then 5–7 day wait",
+      detail: "The city needs this document to complete the historic review. Request it now while you work on other steps.",
+      link: { label: "Request your record", url: "https://arcc-public.sandiegocounty.gov/" },
+    });
+  }
+  phase1Steps.push({
+    title: "Download and review application forms",
+    subtitle: "5 minutes",
+    detail: "You need three forms: DS-345 (Building Permit Application), DS-530 (ADU Supplemental Application), and DS-560 (Plan Submittal Requirements). Review them so you know what your architect needs to include.",
+    link: { label: "Go to DSD forms", url: "https://www.sandiego.gov/development-services" },
+  });
+
+  // Phase 2: Hire professionals
+  let architectDetail = "Your architect produces the complete plan set: site plan, floor plan, elevations, structural calcs, Title 24 energy calcs, and stormwater checklist.";
+  if (hasSetbacks) {
+    const parts = [];
+    if (front) parts.push(`${front}ft from street`);
+    if (side) parts.push(`${side}ft from neighbors`);
+    if (rear) parts.push(`${rear}ft from back`);
+    architectDetail += ` Your setbacks: ${parts.join(" · ")}.`;
+  }
+
+  const phase2Steps: FallbackStep[] = [{
+    title: "Hire an architect and get plans drawn",
+    subtitle: "Or use free pre-approved county plans",
+    detail: architectDetail,
+    warning: "40% of ADU permits in San Diego get sent back for missing Title 24 energy calcs. Make sure they're included in the first submittal.",
+    tip: "County offers free pre-approved ADU plans that can save $5k–$15k in architect fees.",
+    link: { label: "Browse pre-approved plans", url: "https://www.sandiegocounty.gov/pds/bldg/adu_plans.html" },
+  }];
+
+  // Phase 3: Submit everything
+  const submitStep: FallbackStep = isCoastal
+    ? {
+        title: "Submit building + coastal permits together",
+        subtitle: "Through the OpenDSD portal",
+        detail: "Submit both permits at the same time. If you do the building permit first, the coastal review becomes a bottleneck.",
+        link: { label: "Go to permit portal", url: "https://aca-prod.accela.com/SANDIEGO/Default.aspx" },
+      }
+    : {
+        title: "Submit your permit application",
+        subtitle: "Through the OpenDSD portal",
+        detail: "Submit DS-345, DS-530, and your complete plan set. The city has 60 days to review ADU applications by state law.",
+        link: { label: "Go to permit portal", url: "https://aca-prod.accela.com/SANDIEGO/Default.aspx" },
+      };
+
+  const phase3Steps: FallbackStep[] = [
+    submitStep,
+    { title: "Pay plan check fees when invoiced", subtitle: "Review doesn't start until you pay" },
+  ];
+
+  // Phase 4: Wait & respond
+  const phase4Steps: FallbackStep[] = [{
+    title: "Plan review + corrections",
+    subtitle: "60–90 days first review, then 2–3 rounds of corrections",
+  }];
+
+  return [
+    { label: "Do this now · Free · 1–2 weeks", color: "green" as const, steps: phase1Steps },
+    { label: "Hire professionals · 2–4 weeks · $5k–15k", color: "violet" as const, steps: phase2Steps },
+    { label: "Submit everything", color: "blue" as const, steps: phase3Steps },
+    { label: "Wait & respond", color: "gray" as const, steps: phase4Steps },
+  ];
+}
+
 function getDefaultAduOptions(property?: PropertyLookupData | null) {
-  const isMultiFamily = property?.property_type === "multi-family";
-  if (isMultiFamily) {
+  const zoneCode = property?.zone_code?.toUpperCase().trim() ?? "";
+  // Branch on zone prefix, not property_type — RT is classified as "multi-family"
+  // by zoneToPropertyType but actually allows JADU like single-family zones
+  if (zoneCode.startsWith("RM")) {
     return {
       adu_types: [
         { id: "conversion", label: "Convert Non-Livable Space", description: "Convert storage, laundry, or boiler rooms into dwelling units", pros: ["Uses existing structure", "No additional footprint", "Often lower cost"], cons: ["Limited to existing non-livable areas", "May displace shared amenities"] },
@@ -550,18 +676,7 @@ function getFallbackNavigation(
       // Also include options so verdict + options render together for ADU
       result.options = getDefaultAduOptions(property);
     } else if (canvas === "checklist") {
-      result.checklist = {
-        items: [
-          { id: "c1", label: "DS-345 Building Permit Application", description: "Base application for all building permits", required: true, category: "documents" },
-          { id: "c2", label: "DS-530 ADU Supplemental Application", description: "Required for all ADU projects", required: true, category: "documents" },
-          { id: "c3", label: "DS-560 Plan Submittal Requirements", description: "Checklist of plan requirements", required: true, category: "documents" },
-          { id: "c4", label: "Site plan with property lines", description: "Show existing structures, setbacks, and proposed ADU footprint", required: true, category: "plans" },
-          { id: "c5", label: "Floor plans (all levels)", description: "Include dimensions and room labels", required: true, category: "plans" },
-          { id: "c6", label: "Elevation drawings (4 sides)", description: "Show height and exterior design", required: true, category: "plans" },
-          { id: "c7", label: "Title 24 energy compliance report", description: "Required for new construction", required: true, category: "plans" },
-          { id: "c8", label: "Permit fees payment", description: "Fees based on valuation; no impact fees under 750 sq ft", required: true, category: "fees" },
-        ],
-      };
+      result.phases = buildAduFallbackPhases(property);
     } else if (canvas === "options") {
       result.options = getDefaultAduOptions(property);
     }

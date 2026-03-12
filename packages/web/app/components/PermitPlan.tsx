@@ -6,6 +6,9 @@ interface PlanStep {
   title: string;
   subtitle?: string;
   detail?: string;
+  warning?: string;
+  tip?: string;
+  link?: { label: string; url: string };
 }
 
 interface Phase {
@@ -28,6 +31,7 @@ interface Props {
   checklist?: { items?: ChecklistItem[] } | Record<string, unknown>;
   estimated_timeline?: string;
   estimated_cost_range?: string;
+  projectContext?: { address?: string; neighborhood?: string; type?: string; size?: number };
 }
 
 const PHASE_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -68,7 +72,23 @@ const CATEGORY_LABELS: Record<string, { label: string; color: "green" | "violet"
   inspections: { label: "Inspections & review", color: "gray" },
 };
 
-export function PermitPlan({ phases, process_steps, checklist, estimated_timeline, estimated_cost_range }: Props) {
+/** Turn bare URLs in text into clickable links */
+function linkifyText(text: string) {
+  const urlRegex = /(https?:\/\/[^\s),]+)/g;
+  const parts = text.split(urlRegex);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 break-all">
+        {part.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
+export function PermitPlan({ phases, process_steps, checklist, estimated_timeline, estimated_cost_range, projectContext }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const toggle = (key: string) =>
@@ -89,8 +109,27 @@ export function PermitPlan({ phases, process_steps, checklist, estimated_timelin
 
   let globalStepNum = 0;
 
+  // Build context line
+  const contextParts = [
+    projectContext?.address,
+    projectContext?.neighborhood,
+    projectContext?.type,
+    projectContext?.size ? `${projectContext.size} sq ft` : null,
+  ].filter(Boolean);
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Project context header */}
+      {contextParts.length > 0 && (
+        <div>
+          <p className="text-[0.8125rem] text-stone-400 mb-1">{contextParts.join(" · ")}</p>
+          <h1 className="font-serif text-[1.75rem] font-bold text-stone-900 tracking-tight leading-tight mb-2">Your permit plan</h1>
+          <span className="inline-block px-3 py-1 bg-green-50 text-green-700 text-[0.75rem] font-bold rounded-full">
+            ADU Permit · Ministerial (no hearing needed)
+          </span>
+        </div>
+      )}
+
       {/* Big numbers */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-stone-200 rounded-[10px] px-3 py-4 text-center">
@@ -125,7 +164,7 @@ export function PermitPlan({ phases, process_steps, checklist, estimated_timelin
                 {phase.steps.map((step, si) => {
                   globalStepNum++;
                   const key = `${pi}-${si}`;
-                  const hasDetail = !!step.detail;
+                  const hasExpandable = !!(step.detail || step.warning || step.tip || step.link);
                   const isOpen = expanded[key];
 
                   return (
@@ -134,8 +173,8 @@ export function PermitPlan({ phases, process_steps, checklist, estimated_timelin
                       className="bg-white border border-stone-200 rounded-[14px] overflow-hidden"
                     >
                       <div
-                        className={`flex items-center gap-3.5 px-5 py-4 ${hasDetail ? "cursor-pointer" : ""}`}
-                        onClick={hasDetail ? () => toggle(key) : undefined}
+                        className={`flex items-center gap-3.5 px-5 py-4 ${hasExpandable ? "cursor-pointer" : ""}`}
+                        onClick={hasExpandable ? () => toggle(key) : undefined}
                       >
                         <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center text-[0.8125rem] font-bold text-stone-500 shrink-0">
                           {globalStepNum}
@@ -150,15 +189,41 @@ export function PermitPlan({ phases, process_steps, checklist, estimated_timelin
                             </div>
                           )}
                         </div>
-                        {hasDetail && (
+                        {hasExpandable && (
                           <span className={`text-stone-300 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}>
                             ›
                           </span>
                         )}
                       </div>
-                      {hasDetail && isOpen && (
-                        <div className="px-5 pb-4 pl-[4.25rem] text-[0.875rem] text-stone-600 leading-[1.65]">
-                          {step.detail}
+                      {hasExpandable && isOpen && (
+                        <div className="px-5 pb-5 pl-[4.25rem] flex flex-col gap-3">
+                          {step.detail && (
+                            <p className="text-[0.875rem] text-stone-600 leading-[1.65]">
+                              {linkifyText(step.detail)}
+                            </p>
+                          )}
+                          {step.warning && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-[0.8125rem] text-amber-800 leading-[1.55]">
+                              <strong>⚠️ {step.warning}</strong>
+                            </div>
+                          )}
+                          {step.tip && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-[0.8125rem] text-green-800 leading-[1.55]">
+                              ✅ {linkifyText(step.tip)}
+                            </div>
+                          )}
+                          {step.link && (
+                            <div>
+                              <a
+                                href={step.link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 bg-stone-900 text-white rounded-full px-5 py-2.5 text-[0.8125rem] font-bold no-underline hover:bg-black transition-colors"
+                              >
+                                {step.link.label} →
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
