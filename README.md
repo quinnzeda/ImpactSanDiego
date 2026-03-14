@@ -2,6 +2,8 @@
 
 **AI-powered San Diego Building Permit Navigator**
 
+**Live:** [permitpal-sd.vercel.app](https://permitpal-sd.vercel.app)
+
 > Built for the Claude Community x City of San Diego Impact Lab Hackathon (March 7, 2026)
 
 ## Problem
@@ -13,8 +15,7 @@ San Diego's building permit process is opaque and complex. Residents and develop
 PermitPal SD provides two access points to demystify the permit process:
 
 1. **MCP Server** (13 tools) - Claude Code/Desktop users can query SD permit data conversationally
-2. **Next.js Web App** (WIP) - Interactive UI with AI-powered Q&A flow for precise permit roadmaps
-3. **index.html** - Flow demo
+2. **[Next.js Web App](https://permitpal-sd.vercel.app)** - Interactive UI with AI-powered Q&A flow for precise permit roadmaps
 
 ## Features
 

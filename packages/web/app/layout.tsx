@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lora, DM_Sans, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const lora = Lora({
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${lora.variable} ${dmSans.variable} ${geistMono.variable} antialiased`}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
